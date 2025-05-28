@@ -1,31 +1,29 @@
 import requests
 from datetime import datetime
-import json
+import os
+from supabase import create_client, Client
 
-def fetch_daily_games():
-    today = datetime.today().strftime('%Y-%m-%d')
+# Initialize Supabase
+url = os.getenv("SUPABASE_URL")
+key = os.getenv("SUPABASE_KEY")
+supabase: Client = create_client(url, key)
 
-    url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={today}"
-    res = requests.get(url)
-    data = res.json()
+# Today's date
+today = datetime.today().strftime('%Y-%m-%d')
 
-    games = data.get("dates", [])[0].get("games", []) if data.get("dates") else []
+# Fetch games
+mlb_url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={today}"
+res = requests.get(mlb_url)
+data = res.json()
+games = data.get("dates", [])[0].get("games", []) if data.get("dates") else []
 
-    results = []
-    for game in games:
-        home = game['teams']['home']['team']['name']
-        away = game['teams']['away']['team']['name']
-        results.append({
-            "date": today,
-            "home_team": home,
-            "away_team": away
-        })
-
-    return results
-
-if __name__ == "__main__":
-    games = fetch_daily_games()
-    print(json.dumps({
-        "games": games,
-        "count": len(games)
-    }, indent=2))
+# Format and insert
+for game in games:
+    home = game['teams']['home']['team']['name']
+    away = game['teams']['away']['team']['name']
+    game_data = {
+        "date": today,
+        "home_team": home,
+        "away_team": away
+    }
+    supabase.table("input_values").insert(game_data).execute()
