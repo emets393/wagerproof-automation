@@ -1,9 +1,16 @@
 import requests
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, date
 import unicodedata
 from supabase import create_client, Client
 import os
+
+# -----------------------------
+# SUPABASE SETUP
+# -----------------------------
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # -----------------------------
 # CONFIG
@@ -29,6 +36,7 @@ def get_pitcher_stats_and_hand(pitcher_id):
     try:
         res = requests.get(url).json()
         person = res['people'][0]
+
         stats = person.get('stats', [])
         if stats and 'splits' in stats[0] and stats[0]['splits']:
             pitching_stats = stats[0]['splits'][0]['stat']
@@ -36,10 +44,13 @@ def get_pitcher_stats_and_hand(pitcher_id):
             whip = pitching_stats.get('whip', 'N/A')
         else:
             era, whip = 'N/A', 'N/A'
+
         hand = person.get('pitchHand', {}).get('code', 'N')
         handedness = 1 if hand == 'R' else 2 if hand == 'L' else 'N/A'
+
     except:
         era, whip, handedness = 'N/A', 'N/A', 'N/A'
+
     return era, whip, handedness
 
 def remove_accents(text):
@@ -48,7 +59,17 @@ def remove_accents(text):
     return unicodedata.normalize('NFKD', text).encode('ASCII', 'ignore').decode('utf-8')
 
 # -----------------------------
-# STEP 1: Fetch today's games
+# STEP 1: Delete previous entries for today
+# -----------------------------
+today_iso = date.today().isoformat()
+existing_rows = supabase.table("pitcher_stats").select("id, Date").execute().data
+ids_to_delete = [row['id'] for row in existing_rows if row['Date'].startswith(today_iso)]
+
+for row_id in ids_to_delete:
+    supabase.table("pitcher_stats").delete().eq("id", row_id).execute()
+
+# -----------------------------
+# STEP 2: Fetch today's games
 # -----------------------------
 today = datetime.today().strftime('%Y-%m-%d')
 schedule_url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={today}&hydrate=probablePitcher(note,stats),linescore,team"
@@ -57,21 +78,29 @@ data = response.json()
 games = data['dates'][0]['games'] if data['dates'] else []
 
 # -----------------------------
-# STEP 2: Build output list
+# STEP 3: Build pitcher data
 # -----------------------------
 results = []
 
 for game in games:
     away_team = game['teams']['away']['team']['name']
     home_team = game['teams']['home']['team']['name']
+
     away_info = game['teams']['away'].get('probablePitcher')
     home_info = game['teams']['home'].get('probablePitcher')
 
     away_name = away_info['fullName'] if away_info else 'TBD'
     home_name = home_info['fullName'] if home_info else 'TBD'
 
-    away_era, away_whip, away_hand = get_pitcher_stats_and_hand(away_info['id']) if away_info else ('N/A', 'N/A', 'N/A')
-    home_era, home_whip, home_hand = get_pitcher_stats_and_hand(home_info['id']) if home_info else ('N/A', 'N/A', 'N/A')
+    if away_info:
+        away_era, away_whip, away_hand = get_pitcher_stats_and_hand(away_info['id'])
+    else:
+        away_era, away_whip, away_hand = 'N/A', 'N/A', 'N/A'
+
+    if home_info:
+        home_era, home_whip, home_hand = get_pitcher_stats_and_hand(home_info['id'])
+    else:
+        home_era, home_whip, home_hand = 'N/A', 'N/A', 'N/A'
 
     results.append({
         'Date': today,
@@ -88,13 +117,7 @@ for game in games:
     })
 
 # -----------------------------
-# STEP 3: Upload to Supabase
+# STEP 4: Insert into Supabase
 # -----------------------------
-df = pd.DataFrame(results)
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-data_to_insert = df.to_dict(orient="records")
-response = supabase.table("pitcher_stats").upsert(data_to_insert).execute()
-print("Inserted:", len(response.data), "rows")
+if results:
+    supabase.table("pitcher_stats").insert(results).execute()
