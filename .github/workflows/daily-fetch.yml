@@ -2,7 +2,7 @@ name: Fetch Daily MLB Games
 
 on:
   schedule:
-    - cron: '0 13 * * *'  # 9:00 AM ET
+    - cron: '0 13 * * *'  # 8:00 AM ET
   workflow_dispatch:
 
 jobs:
