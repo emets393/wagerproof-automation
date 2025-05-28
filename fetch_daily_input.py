@@ -14,7 +14,8 @@ today = datetime.today().strftime('%Y-%m-%d')
 date_str = pd.to_datetime(today).strftime("%Y%m%d")
 
 # Fetch team mapping (full name -> short name, number)
-team_map_resp = supabase.table("team_name_map").select("full_name, short_name, team_number").execute()
+team_map_resp = supabase.table("mlb_teams").select("full_name, short_name, team_number").execute()
+
 team_map = {
     t["full_name"]: {
         "short": t["short_name"],
