@@ -1,8 +1,7 @@
 name: Fetch Daily Input
-
 on:
   schedule:
-    - cron: '0 12 * * *'  # 8:00 AM ET (runs at 12:00 PM UTC)
+    - cron: '0 12 * * *'  # 8:00 AM ET daily
   workflow_dispatch:
 
 jobs:
@@ -10,24 +9,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: 3.11
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install pandas requests supabase
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas requests supabase
 
-    - name: Run input fetch script
-      env:
-        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-      run: python fetch_daily_input.py
+      - name: Run input fetch script
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python fetch_daily_input.py
 
 
 
