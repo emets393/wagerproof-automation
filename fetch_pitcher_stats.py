@@ -1,123 +1,90 @@
-import requests
-import pandas as pd
-from datetime import datetime, date
-import unicodedata
-from supabase import create_client, Client
+# fetch_pitcher_stats.py
+
 import os
+import requests
+from datetime import datetime
+from supabase import create_client, Client
+import pytz
 
 # -----------------------------
 # SUPABASE SETUP
 # -----------------------------
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase_url = os.environ.get("SUPABASE_URL")
+supabase_key = os.environ.get("SUPABASE_KEY")
+
+if not supabase_url or not supabase_key:
+    raise Exception("Supabase environment variables are not set.")
+
+supabase: Client = create_client(supabase_url, supabase_key)
 
 # -----------------------------
-# CONFIG
+# TIME & DATE SETUP
 # -----------------------------
-team_name_map = {
-    "Arizona Diamondbacks": "Arizona", "Atlanta Braves": "Atlanta", "Baltimore Orioles": "Baltimore",
-    "Boston Red Sox": "Boston", "Chicago Cubs": "Cubs", "Chicago White Sox": "White Sox",
-    "Cincinnati Reds": "Cincinnati", "Cleveland Guardians": "Cleveland", "Colorado Rockies": "Colorado",
-    "Detroit Tigers": "Detroit", "Houston Astros": "Houston", "Kansas City Royals": "Kansas City",
-    "Los Angeles Angels": "Angels", "Los Angeles Dodgers": "Dodgers", "Miami Marlins": "Miami",
-    "Milwaukee Brewers": "Milwaukee", "Minnesota Twins": "Minnesota", "New York Mets": "Mets",
-    "New York Yankees": "Yankees", "Oakland Athletics": "Oakland", "Philadelphia Phillies": "Philadelphia",
-    "Pittsburgh Pirates": "Pittsburgh", "San Diego Padres": "San Diego", "San Francisco Giants": "San Francisco",
-    "Seattle Mariners": "Seattle", "St. Louis Cardinals": "ST Louis", "Tampa Bay Rays": "Tampa Bay",
-    "Texas Rangers": "Texas", "Toronto Blue Jays": "Toronto", "Washington Nationals": "Washington"
-}
+eastern = pytz.timezone("US/Eastern")
+today_et = datetime.now(eastern).date()
+today = today_et.strftime('%Y-%m-%d')
 
 # -----------------------------
-# FUNCTIONS
+# FETCH PITCHER STATS
 # -----------------------------
-def get_pitcher_stats_and_hand(pitcher_id):
-    url = f"https://statsapi.mlb.com/api/v1/people/{pitcher_id}?hydrate=stats(group=[pitching],type=[season])"
-    try:
-        res = requests.get(url).json()
-        person = res['people'][0]
-
-        stats = person.get('stats', [])
-        if stats and 'splits' in stats[0] and stats[0]['splits']:
-            pitching_stats = stats[0]['splits'][0]['stat']
-            era = pitching_stats.get('era', 'N/A')
-            whip = pitching_stats.get('whip', 'N/A')
-        else:
-            era, whip = 'N/A', 'N/A'
-
-        hand = person.get('pitchHand', {}).get('code', 'N')
-        handedness = 1 if hand == 'R' else 2 if hand == 'L' else 'N/A'
-
-    except:
-        era, whip, handedness = 'N/A', 'N/A', 'N/A'
-
-    return era, whip, handedness
-
-def remove_accents(text):
-    if not isinstance(text, str):
-        return text
-    return unicodedata.normalize('NFKD', text).encode('ASCII', 'ignore').decode('utf-8')
-
-# -----------------------------
-# STEP 1: Delete previous entries for today
-# -----------------------------
-today_iso = date.today().isoformat()
-existing_rows = supabase.table("pitcher_stats").select("id, Date").execute().data
-ids_to_delete = [row['id'] for row in existing_rows if row['Date'].startswith(today_iso)]
-
-for row_id in ids_to_delete:
-    supabase.table("pitcher_stats").delete().eq("id", row_id).execute()
-
-# -----------------------------
-# STEP 2: Fetch today's games
-# -----------------------------
-today = datetime.today().strftime('%Y-%m-%d')
-schedule_url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={today}&hydrate=probablePitcher(note,stats),linescore,team"
-response = requests.get(schedule_url)
+url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={today}&hydrate=probablePitcher(note,stats(type=season,group=pitching))"
+response = requests.get(url)
 data = response.json()
-games = data['dates'][0]['games'] if data['dates'] else []
+games = data.get("dates", [])[0].get("games", []) if data.get("dates") else []
 
 # -----------------------------
-# STEP 3: Build pitcher data
+# TEAM MAPPING
 # -----------------------------
-results = []
+team_map_resp = supabase.table("mlb_teams").select("full_name, short_name").execute()
+team_map = {team["full_name"].lower(): team["short_name"] for team in team_map_resp.data}
 
+# -----------------------------
+# PROCESS GAMES
+# -----------------------------
 for game in games:
-    away_team = game['teams']['away']['team']['name']
-    home_team = game['teams']['home']['team']['name']
+    game_date = today
+    game_time_utc = game.get("gameDate")
+    start_hour_minute = datetime.fromisoformat(game_time_utc.replace("Z", "+00:00")).strftime('%H:%M')
 
-    away_info = game['teams']['away'].get('probablePitcher')
-    home_info = game['teams']['home'].get('probablePitcher')
+    home_team = game["teams"]["home"]["team"]["name"].lower()
+    away_team = game["teams"]["away"]["team"]["name"].lower()
 
-    away_name = away_info['fullName'] if away_info else 'TBD'
-    home_name = home_info['fullName'] if home_info else 'TBD'
+    home_team_short = team_map.get(home_team, home_team)
+    away_team_short = team_map.get(away_team, away_team)
 
-    if away_info:
-        away_era, away_whip, away_hand = get_pitcher_stats_and_hand(away_info['id'])
-    else:
-        away_era, away_whip, away_hand = 'N/A', 'N/A', 'N/A'
+    unique_id = f"{game_date}-{home_team_short}_{away_team_short}_{start_hour_minute}"
 
-    if home_info:
-        home_era, home_whip, home_hand = get_pitcher_stats_and_hand(home_info['id'])
-    else:
-        home_era, home_whip, home_hand = 'N/A', 'N/A', 'N/A'
+    def extract_pitcher_data(team_key):
+        pitcher = game["teams"][team_key].get("probablePitcher")
+        if not pitcher:
+            return None, None, None
 
-    results.append({
-        'Date': today,
-        'Away Team': team_name_map.get(away_team, away_team),
-        'Away Pitcher': remove_accents(away_name),
-        'Away ERA': away_era,
-        'Away WHIP': away_whip,
-        'Away Handedness': away_hand,
-        'Home Team': team_name_map.get(home_team, home_team),
-        'Home Pitcher': remove_accents(home_name),
-        'Home ERA': home_era,
-        'Home WHIP': home_whip,
-        'Home Handedness': home_hand
-    })
+        stats = pitcher.get("stats", [])
+        season_stats = next((s for s in stats if s.get("type", {}).get("displayName") == "season"), {})
+        splits = season_stats.get("splits", [{}])[0]
 
-# -----------------------------
-# STEP 4: Insert into Supabase
-# -----------------------------
-if results:
-    supabase.table("pitcher_stats").insert(results).execute()
+        era = splits.get("era")
+        whip = splits.get("whip")
+        hand = pitcher.get("pitchHand", {}).get("description")
+        return era, whip, hand
+
+    home_era, home_whip, home_hand = extract_pitcher_data("home")
+    away_era, away_whip, away_hand = extract_pitcher_data("away")
+
+    row = {
+        "unique_id": unique_id,
+        "game_date": game_date,
+        "home_team": home_team_short,
+        "away_team": away_team_short,
+        "start_time_utc": game_time_utc,
+        "home_pitcher_era": home_era,
+        "home_pitcher_whip": home_whip,
+        "home_pitcher_hand": home_hand,
+        "away_pitcher_era": away_era,
+        "away_pitcher_whip": away_whip,
+        "away_pitcher_hand": away_hand
+    }
+
+    supabase.table("pitcher_stats").upsert(row, on_conflict=["unique_id"]).execute()
+    print(f"⬆️ Inserted pitcher stats for: {unique_id}")
+
