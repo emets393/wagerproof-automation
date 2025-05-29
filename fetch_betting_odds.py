@@ -1,24 +1,25 @@
+from supabase import create_client, Client
 import requests
 from datetime import datetime
 import os
-from supabase import create_client, Client
 
 # -----------------------------
-# CONFIGURATION
+# SUPABASE SETUP
 # -----------------------------
-RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+url = os.getenv("SUPABASE_URL")
+key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+supabase: Client = create_client(url, key)
 
-# Initialize Supabase client
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# -----------------------------
+# FETCH TEAM MAPPING
+# -----------------------------
+team_map_resp = supabase.table("mlb_teams").select("full_name, short_name, team_number").execute()
+team_map = {t["full_name"]: {"short": t["short_name"], "number": t["team_number"]} for t in team_map_resp.data}
 
-# Today's date
+# -----------------------------
+# RAPIDAPI CONFIG
+# -----------------------------
 today = datetime.today().strftime('%Y-%m-%d')
-
-# -----------------------------
-# FETCH FROM API
-# -----------------------------
 url = "https://odds.p.rapidapi.com/v4/sports/baseball_mlb/odds"
 querystring = {
     "regions": "us",
@@ -27,93 +28,79 @@ querystring = {
     "dateFormat": "iso",
     "date": today
 }
-
 headers = {
     "x-rapidapi-host": "odds.p.rapidapi.com",
-    "x-rapidapi-key": RAPIDAPI_KEY
+    "x-rapidapi-key": os.getenv("RAPIDAPI_KEY")
 }
 
+# -----------------------------
+# FETCH ODDS DATA
+# -----------------------------
 response = requests.get(url, headers=headers, params=querystring)
-
-if response.status_code != 200:
-    print(f"Error fetching data: {response.status_code}")
-    print(response.text)
-    exit()
-
-try:
-    games = response.json()
-except Exception as e:
-    print("Failed to parse JSON response:", e)
-    exit()
+games = response.json()
 
 # -----------------------------
-# FORMAT & STORE IN SUPABASE
+# PROCESS GAMES
 # -----------------------------
+records = []
 for game in games:
-    if not isinstance(game, dict):
-        print("Skipping invalid game object:", game)
-        continue
-
-    game_id = game.get("id")  # Unique game identifier
-    commence_time = game.get("commence_time")
     home_team = game.get("home_team")
     away_team = game.get("away_team")
-    bookmakers = game.get("bookmakers", [])
+    game_id = game.get("id")
+    commence_time = game.get("commence_time")
 
-    home_ml = away_ml = home_spread = away_spread = spread_point = total = None
-    home_spread_odds = away_spread_odds = over_odds = under_odds = None
+    # Map short names and numbers
+    home_info = team_map.get(home_team, {"short": home_team, "number": None})
+    away_info = team_map.get(away_team, {"short": away_team, "number": None})
 
-    for bookmaker in bookmakers:
-        for market in bookmaker.get("markets", []):
-            if market["key"] == "h2h":
-                outcomes = market.get("outcomes", [])
-                for outcome in outcomes:
-                    if outcome["name"] == home_team:
-                        home_ml = outcome["price"]
-                    elif outcome["name"] == away_team:
-                        away_ml = outcome["price"]
-
-            elif market["key"] == "spreads":
-                outcomes = market.get("outcomes", [])
-                for outcome in outcomes:
-                    if outcome["name"] == home_team:
-                        home_spread = outcome["point"]
-                        home_spread_odds = outcome["price"]
-                    elif outcome["name"] == away_team:
-                        away_spread = outcome["point"]
-                        away_spread_odds = outcome["price"]
-                    spread_point = outcome.get("point")
-
-            elif market["key"] == "totals":
-                outcomes = market.get("outcomes", [])
-                for outcome in outcomes:
-                    if outcome["name"].lower() == "over":
-                        total = outcome["point"]
-                        over_odds = outcome["price"]
-                    elif outcome["name"].lower() == "under":
-                        under_odds = outcome["price"]
-
+    # Create row template
     row = {
-        "date": today,
         "game_id": game_id,
+        "commence_time": commence_time,
         "home_team": home_team,
         "away_team": away_team,
-        "home_ml": home_ml,
-        "away_ml": away_ml,
-        "home_spread": home_spread,
-        "home_spread_odds": home_spread_odds,
-        "away_spread": away_spread,
-        "away_spread_odds": away_spread_odds,
-        "total": total,
-        "over_odds": over_odds,
-        "under_odds": under_odds,
-        "commence_time": commence_time,
-        "first_fetch": today,
-        "last_fetch": today
+        "home_team_short": home_info["short"],
+        "away_team_short": away_info["short"],
+        "home_team_number": home_info["number"],
+        "away_team_number": away_info["number"],
+        "first_fetched": datetime.utcnow().isoformat(),
+        "last_fetched": datetime.utcnow().isoformat(),
     }
 
-    # Upsert into Supabase table `mlb_betting_lines`
+    # Extract DraftKings data
+    dk = next((b for b in game["bookmakers"] if b["key"] == "draftkings"), None)
+    if dk:
+        for market in dk.get("markets", []):
+            if market["key"] == "h2h":
+                for outcome in market["outcomes"]:
+                    if outcome["name"] == home_team:
+                        row["home_moneyline"] = outcome["price"]
+                    elif outcome["name"] == away_team:
+                        row["away_moneyline"] = outcome["price"]
+            elif market["key"] == "spreads":
+                for outcome in market["outcomes"]:
+                    if outcome["name"] == home_team:
+                        row["home_spread"] = outcome["point"]
+                        row["home_spread_odds"] = outcome["price"]
+                    elif outcome["name"] == away_team:
+                        row["away_spread"] = outcome["point"]
+                        row["away_spread_odds"] = outcome["price"]
+            elif market["key"] == "totals":
+                for outcome in market["outcomes"]:
+                    if outcome["name"] == "Over":
+                        row["total_line"] = outcome["point"]
+                        row["over_odds"] = outcome["price"]
+                    elif outcome["name"] == "Under":
+                        row["under_odds"] = outcome["price"]
+
+    records.append(row)
+
+# -----------------------------
+# UPSERT TO SUPABASE
+# -----------------------------
+for row in records:
     supabase.table("mlb_betting_lines").upsert(row, on_conflict=["game_id"]).execute()
+
 
 
 
