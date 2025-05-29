@@ -84,9 +84,12 @@ def odds_changed(existing, new):
 # -----------------------------
 for game in games:
     commence_time = datetime.fromisoformat(game["commence_time"]).replace(tzinfo=pytz.utc)
-    commence_et = commence_time.astimezone(pytz.timezone("US/Eastern"))
-    if commence_et.date() != today_et:
-        continue  # Skip games not on today's ET date
+    eastern = pytz.timezone("US/Eastern")
+    start_of_day = eastern.localize(datetime.combine(today_et, datetime.min.time()))
+    end_of_day = eastern.localize(datetime.combine(today_et, datetime.max.time()))
+    commence_et = commence_time.astimezone(eastern)
+    if not (start_of_day <= commence_et <= end_of_day):
+        continue  # Skip games not strictly today in ET
     if commence_time <= cutoff_time:
         continue  # Skip games starting within 1 hour
 
@@ -160,6 +163,7 @@ for game in games:
             print(f"🔁 Updated history (odds changed): {home_team} vs {away_team}")
         else:
             print(f"⏸ No update needed for: {home_team} vs {away_team}")
+
 
 
 
