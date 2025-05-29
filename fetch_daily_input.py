@@ -1,29 +1,26 @@
+# fetch_daily_input.py
+
 import requests
 from datetime import datetime
 import os
+import pytz
 from supabase import create_client, Client
 
-# -----------------------------
-# SUPABASE SETUP
-# -----------------------------
-url = os.getenv("SUPABASE_URL")
-key = os.getenv("SUPABASE_KEY")
-supabase: Client = create_client(url, key)
+# Supabase setup
+supabase_url = os.getenv("SUPABASE_URL")
+supabase_key = os.getenv("SUPABASE_KEY")
+supabase: Client = create_client(supabase_url, supabase_key)
 
-# -----------------------------
-# DATE SETUP
-# -----------------------------
-today = datetime.today().strftime('%Y-%m-%d')
+# Time setup
+eastern = pytz.timezone("US/Eastern")
+today_et = datetime.now(eastern)
+today = today_et.strftime('%Y-%m-%d')
 
-# -----------------------------
-# TEAM NORMALIZATION
-# -----------------------------
+# Normalize function
 def normalize_team_name(name):
     return name.strip().lower().replace("é", "e")
 
-# -----------------------------
-# TEAM MAPPING FROM SUPABASE
-# -----------------------------
+# Fetch team mapping
 team_map_resp = supabase.table("mlb_teams").select("full_name, short_name, team_number").execute()
 team_map = {
     normalize_team_name(team["full_name"]): {
@@ -33,44 +30,45 @@ team_map = {
     for team in team_map_resp.data
 }
 
-# -----------------------------
-# FETCH TODAY'S MLB GAMES
-# -----------------------------
+# Fetch game data
 mlb_url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={today}&expand=schedule.teams"
 res = requests.get(mlb_url)
 data = res.json()
 games = data.get("dates", [])[0].get("games", []) if data.get("dates") else []
 
-# -----------------------------
-# DELETE EXISTING ROWS FOR TODAY
-# -----------------------------
-supabase.table("input_values").delete().eq("date", today).execute()
+# Delete old rows
+supabase.table("input_values").delete().eq("game_date", today).execute()
 
-# -----------------------------
-# INSERT NEW GAMES
-# -----------------------------
+# Insert input values
 for game in games:
     game_pk = game.get("gamePk")
     home_full = game['teams']['home']['team']['name']
     away_full = game['teams']['away']['team']['name']
+    game_time_utc = game.get("gameDate")
+
+    dt_utc = datetime.fromisoformat(game_time_utc.replace("Z", "+00:00"))
+    dt_et = dt_utc.astimezone(eastern)
+    game_date = dt_et.strftime('%Y-%m-%d')
+    start_time = dt_et.strftime('%H:%M')
 
     home_data = team_map.get(normalize_team_name(home_full), {"short": home_full, "number": None})
     away_data = team_map.get(normalize_team_name(away_full), {"short": away_full, "number": None})
 
-    unique_id = f"{home_data['short']}_{away_data['short']}_{game_pk}"
+    unique_id = f"{game_date}-{home_data['short']}_{away_data['short']}_{start_time}"
 
     row = {
-        "date": today,
+        "unique_id": unique_id,
+        "game_date": game_date,
+        "start_time_et": dt_et.strftime('%Y-%m-%d %H:%M:%S'),
         "home_team": home_data["short"],
         "home_team_number": home_data["number"],
         "away_team": away_data["short"],
-        "away_team_number": away_data["number"],
-        "game_pk": game_pk,
-        "unique_id": unique_id
+        "away_team_number": away_data["number"]
     }
 
     supabase.table("input_values").insert(row).execute()
-    print(f"✅ Inserted: {home_data['short']} vs {away_data['short']} ({unique_id})")
+    print(f"⬆️ Input inserted for: {unique_id}")
+
 
 
 
