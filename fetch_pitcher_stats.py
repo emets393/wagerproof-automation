@@ -43,12 +43,11 @@ team_map = {team["full_name"].lower(): team["short_name"] for team in team_map_r
 # -----------------------------
 for game in games:
     try:
-        game_time_utc = game.get("gameDate")
-        dt_utc = datetime.fromisoformat(game_time_utc.replace("Z", "+00:00"))
+        game_date = today
+        game_time_utc_raw = game.get("gameDate")
+        dt_utc = datetime.fromisoformat(game_time_utc_raw.replace("Z", "+00:00"))
         dt_et = dt_utc.astimezone(eastern)
-        game_date = dt_et.strftime('%Y-%m-%d')
-        start_time_et = dt_et.strftime('%Y-%m-%d %H:%M:%S')
-        start_time_utc = dt_utc.strftime('%Y-%m-%d %H:%M:%S')
+        start_time = dt_et.strftime('%H:%M')
 
         home_team = game["teams"]["home"]["team"]["name"].lower()
         away_team = game["teams"]["away"]["team"]["name"].lower()
@@ -56,15 +55,17 @@ for game in games:
         home_team_short = team_map.get(home_team, home_team)
         away_team_short = team_map.get(away_team, away_team)
 
-        unique_id = f"{game_date}-{home_team_short}_{away_team_short}_{dt_et.strftime('%H:%M')}"
+        unique_id = f"{game_date}-{home_team_short}_{away_team_short}_{start_time}"
 
         def extract_pitcher_data(team_key):
             pitcher = game["teams"][team_key].get("probablePitcher")
             if not pitcher:
                 return None, None, None
+
             stats = pitcher.get("stats", [])
             season_stats = next((s for s in stats if s.get("type", {}).get("displayName") == "season"), {})
             splits = season_stats.get("splits", [{}])[0]
+
             era = splits.get("era")
             whip = splits.get("whip")
             hand = pitcher.get("pitchHand", {}).get("description")
@@ -76,8 +77,8 @@ for game in games:
         row = {
             "unique_id": unique_id,
             "game_date": game_date,
-            "start_time_et": start_time_et,
-            "start_time_utc": start_time_utc,
+            "start_time_utc": dt_utc.strftime('%Y-%m-%d %H:%M:%S'),
+            "start_time_et": dt_et.strftime('%Y-%m-%d %H:%M:%S'),
             "home_team": home_team_short,
             "away_team": away_team_short,
             "home_pitcher_era": home_era,
@@ -93,5 +94,6 @@ for game in games:
 
     except Exception as e:
         print(f"⚠️ Failed to insert game: {e}")
+
 
 
