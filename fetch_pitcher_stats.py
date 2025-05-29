@@ -21,7 +21,7 @@ supabase: Client = create_client(supabase_url, supabase_key)
 # TIME & DATE SETUP
 # -----------------------------
 eastern = pytz.timezone("US/Eastern")
-today_et = datetime.now(eastern).date()
+today_et = datetime.now(eastern)
 today = today_et.strftime('%Y-%m-%d')
 
 # -----------------------------
@@ -42,49 +42,56 @@ team_map = {team["full_name"].lower(): team["short_name"] for team in team_map_r
 # PROCESS GAMES
 # -----------------------------
 for game in games:
-    game_date = today
-    game_time_utc = game.get("gameDate")
-    start_hour_minute = datetime.fromisoformat(game_time_utc.replace("Z", "+00:00")).strftime('%H:%M')
+    try:
+        game_time_utc = game.get("gameDate")
+        dt_utc = datetime.fromisoformat(game_time_utc.replace("Z", "+00:00"))
+        dt_et = dt_utc.astimezone(eastern)
+        game_date = dt_et.strftime('%Y-%m-%d')
+        start_time_et = dt_et.strftime('%Y-%m-%d %H:%M:%S')
+        start_time_utc = dt_utc.strftime('%Y-%m-%d %H:%M:%S')
 
-    home_team = game["teams"]["home"]["team"]["name"].lower()
-    away_team = game["teams"]["away"]["team"]["name"].lower()
+        home_team = game["teams"]["home"]["team"]["name"].lower()
+        away_team = game["teams"]["away"]["team"]["name"].lower()
 
-    home_team_short = team_map.get(home_team, home_team)
-    away_team_short = team_map.get(away_team, away_team)
+        home_team_short = team_map.get(home_team, home_team)
+        away_team_short = team_map.get(away_team, away_team)
 
-    unique_id = f"{game_date}-{home_team_short}_{away_team_short}_{start_hour_minute}"
+        unique_id = f"{game_date}-{home_team_short}_{away_team_short}_{dt_et.strftime('%H:%M')}"
 
-    def extract_pitcher_data(team_key):
-        pitcher = game["teams"][team_key].get("probablePitcher")
-        if not pitcher:
-            return None, None, None
+        def extract_pitcher_data(team_key):
+            pitcher = game["teams"][team_key].get("probablePitcher")
+            if not pitcher:
+                return None, None, None
+            stats = pitcher.get("stats", [])
+            season_stats = next((s for s in stats if s.get("type", {}).get("displayName") == "season"), {})
+            splits = season_stats.get("splits", [{}])[0]
+            era = splits.get("era")
+            whip = splits.get("whip")
+            hand = pitcher.get("pitchHand", {}).get("description")
+            return era, whip, hand
 
-        stats = pitcher.get("stats", [])
-        season_stats = next((s for s in stats if s.get("type", {}).get("displayName") == "season"), {})
-        splits = season_stats.get("splits", [{}])[0]
+        home_era, home_whip, home_hand = extract_pitcher_data("home")
+        away_era, away_whip, away_hand = extract_pitcher_data("away")
 
-        era = splits.get("era")
-        whip = splits.get("whip")
-        hand = pitcher.get("pitchHand", {}).get("description")
-        return era, whip, hand
+        row = {
+            "unique_id": unique_id,
+            "game_date": game_date,
+            "start_time_et": start_time_et,
+            "start_time_utc": start_time_utc,
+            "home_team": home_team_short,
+            "away_team": away_team_short,
+            "home_pitcher_era": home_era,
+            "home_pitcher_whip": home_whip,
+            "home_pitcher_hand": home_hand,
+            "away_pitcher_era": away_era,
+            "away_pitcher_whip": away_whip,
+            "away_pitcher_hand": away_hand
+        }
 
-    home_era, home_whip, home_hand = extract_pitcher_data("home")
-    away_era, away_whip, away_hand = extract_pitcher_data("away")
+        supabase.table("pitcher_stats").upsert(row, on_conflict=["unique_id"]).execute()
+        print(f"✅ Inserted pitcher stats for: {unique_id}")
 
-    row = {
-        "unique_id": unique_id,
-        "game_date": game_date,
-        "home_team": home_team_short,
-        "away_team": away_team_short,
-        "start_time_utc": game_time_utc,
-        "home_pitcher_era": home_era,
-        "home_pitcher_whip": home_whip,
-        "home_pitcher_hand": home_hand,
-        "away_pitcher_era": away_era,
-        "away_pitcher_whip": away_whip,
-        "away_pitcher_hand": away_hand
-    }
+    except Exception as e:
+        print(f"⚠️ Failed to insert game: {e}")
 
-    supabase.table("pitcher_stats").upsert(row, on_conflict=["unique_id"]).execute()
-    print(f"⬆️ Inserted pitcher stats for: {unique_id}")
 
