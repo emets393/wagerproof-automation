@@ -2,7 +2,7 @@ name: Fetch MLB Betting Odds
 
 on:
   schedule:
-    - cron: '0 12,14,16,18,20,22 * * *'  # UTC: 8AM, 10AM, 12PM, 2PM, 4PM, 6PM EDT
+    - cron: '0 12,14,16,18,20,22 * * *'  # Runs every 2 hours from 8AM–6PM ET
   workflow_dispatch:
 
 jobs:
@@ -16,7 +16,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: '3.11'
 
       - name: Install dependencies
         run: |
@@ -26,7 +26,7 @@ jobs:
       - name: Run betting odds fetch script
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_KEY }}
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
         run: python fetch_betting_odds.py
 
