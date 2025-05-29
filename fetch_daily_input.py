@@ -22,8 +22,8 @@ team_map = {
     for t in team_map_resp.data
 }
 
-# Fetch today's games
-mlb_url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={today}"
+# Fetch today's games from MLB API
+mlb_url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={today}&hydrate=linescore"
 res = requests.get(mlb_url)
 data = res.json()
 games = data.get("dates", [])[0].get("games", []) if data.get("dates") else []
@@ -33,14 +33,14 @@ supabase.table("input_values").delete().eq("date", today).execute()
 
 # Insert updated records
 for game in games:
+    game_pk = game.get("gamePk")
     home_full = game['teams']['home']['team']['name']
     away_full = game['teams']['away']['team']['name']
 
     home_data = team_map.get(home_full, {"short": home_full, "number": None})
     away_data = team_map.get(away_full, {"short": away_full, "number": None})
 
-    # Use gamePk as unique_id to handle doubleheaders
-    unique_id = str(game['gamePk'])
+    unique_id = f"{home_data['short']}{away_data['short']}{game_pk}"
 
     row = {
         "date": today,
@@ -48,7 +48,8 @@ for game in games:
         "home_team_number": home_data["number"],
         "away_team": away_data["short"],
         "away_team_number": away_data["number"],
-        "unique_id": unique_id
+        "unique_id": unique_id,
+        "game_pk": game_pk
     }
 
     supabase.table("input_values").insert(row).execute()
