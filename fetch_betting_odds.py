@@ -1,14 +1,14 @@
 import os
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from supabase import create_client, Client
+import pytz
 
 # -----------------------------
 # SUPABASE SETUP
 # -----------------------------
 supabase_url = os.environ.get("SUPABASE_URL")
 supabase_key = os.environ.get("SUPABASE_KEY")
-
 
 if not supabase_url or not supabase_key:
     raise Exception("Supabase environment variables are not set.")
@@ -19,8 +19,8 @@ supabase: Client = create_client(supabase_url, supabase_key)
 # API SETUP
 # -----------------------------
 today = datetime.today().strftime('%Y-%m-%d')
-
 url = "https://odds.p.rapidapi.com/v4/sports/baseball_mlb/odds"
+
 querystring = {
     "regions": "us",
     "oddsFormat": "american",
@@ -48,6 +48,12 @@ team_map_resp = supabase.table("mlb_teams").select("full_name, short_name, team_
 team_map = {team["full_name"]: team for team in team_map_resp.data}
 
 # -----------------------------
+# TIME FILTER SETUP
+# -----------------------------
+now_utc = datetime.utcnow().replace(tzinfo=pytz.utc)
+cutoff_time = now_utc + timedelta(hours=1)
+
+# -----------------------------
 # HELPER FUNCTIONS
 # -----------------------------
 def extract_market(bookmaker, market_key):
@@ -56,15 +62,19 @@ def extract_market(bookmaker, market_key):
             return market.get("outcomes", [])
     return []
 
-def find_outcome(outcomes, team_name):
-    return next((o for o in outcomes if o["name"] == team_name), {})
+def find_outcome(outcomes, name):
+    return next((o for o in outcomes if o["name"] == name), {})
+
+def find_ou_outcome(outcomes, ou_type):
+    return next((o for o in outcomes if o["name"].lower() == ou_type), {})
 
 def odds_changed(existing, new):
     fields = [
         "home_moneyline", "away_moneyline",
         "home_spread", "home_spread_odds",
         "away_spread", "away_spread_odds",
-        "over_under_total"
+        "over_price", "over_point",
+        "under_price", "under_point"
     ]
     return any(existing.get(f) != new.get(f) for f in fields)
 
@@ -72,8 +82,11 @@ def odds_changed(existing, new):
 # PROCESS EACH GAME
 # -----------------------------
 for game in games:
+    commence_time = datetime.fromisoformat(game["commence_time"]).replace(tzinfo=pytz.utc)
+    if commence_time <= cutoff_time:
+        continue  # skip games starting within 1 hour
+
     game_id = game["id"]
-    game_time = game["commence_time"]
     home_team_long = game["home_team"]
     away_team_long = game["away_team"]
 
@@ -99,13 +112,15 @@ for game in games:
     away_spread_data = find_outcome(spreads, away_team_long)
     home_ml_data = find_outcome(h2h, home_team_long)
     away_ml_data = find_outcome(h2h, away_team_long)
-    ou_total = totals[0]["point"] if totals else None
+
+    over_data = find_ou_outcome(totals, "over")
+    under_data = find_ou_outcome(totals, "under")
 
     now_iso = datetime.utcnow().isoformat()
 
     row = {
         "game_id": game_id,
-        "game_time": game_time,
+        "game_time": game["commence_time"],
         "home_team": home_team,
         "away_team": away_team,
         "home_team_number": home_team_number,
@@ -116,7 +131,10 @@ for game in games:
         "away_spread": away_spread_data.get("point"),
         "away_spread_odds": away_spread_data.get("price"),
         "away_moneyline": away_ml_data.get("price"),
-        "over_under_total": ou_total,
+        "over_point": over_data.get("point"),
+        "over_price": over_data.get("price"),
+        "under_point": under_data.get("point"),
+        "under_price": under_data.get("price"),
         "first_fetched": now_iso,
         "last_fetched": now_iso,
     }
@@ -138,6 +156,7 @@ for game in games:
             print(f"🔁 Updated history (odds changed): {home_team} vs {away_team}")
         else:
             print(f"⏸ No update needed for: {home_team} vs {away_team}")
+
 
 
 
