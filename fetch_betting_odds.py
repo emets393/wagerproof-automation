@@ -52,6 +52,7 @@ team_map = {team["full_name"]: team for team in team_map_resp.data}
 # -----------------------------
 now_utc = datetime.utcnow().replace(tzinfo=pytz.utc)
 cutoff_time = now_utc + timedelta(hours=1)
+today_et = datetime.now(pytz.timezone("US/Eastern")).date()
 
 # -----------------------------
 # HELPER FUNCTIONS
@@ -83,8 +84,11 @@ def odds_changed(existing, new):
 # -----------------------------
 for game in games:
     commence_time = datetime.fromisoformat(game["commence_time"]).replace(tzinfo=pytz.utc)
+    commence_et = commence_time.astimezone(pytz.timezone("US/Eastern"))
+    if commence_et.date() != today_et:
+        continue  # Skip games not on today's ET date
     if commence_time <= cutoff_time:
-        continue  # skip games starting within 1 hour
+        continue  # Skip games starting within 1 hour
 
     game_id = game["id"]
     home_team_long = game["home_team"]
@@ -156,6 +160,7 @@ for game in games:
             print(f"🔁 Updated history (odds changed): {home_team} vs {away_team}")
         else:
             print(f"⏸ No update needed for: {home_team} vs {away_team}")
+
 
 
 
