@@ -50,9 +50,10 @@ team_map = {team["full_name"]: team for team in team_map_resp.data}
 # -----------------------------
 # TIME FILTER SETUP
 # -----------------------------
-now_utc = datetime.utcnow().replace(tzinfo=pytz.utc)
-cutoff_time = now_utc + timedelta(hours=1)
-today_et = datetime.now(pytz.timezone("US/Eastern")).date()
+eastern = pytz.timezone("US/Eastern")
+now_et = datetime.now(eastern)
+today_et = now_et.date()
+cutoff_time = now_et.astimezone(pytz.utc) + timedelta(hours=1)
 
 # -----------------------------
 # HELPER FUNCTIONS
@@ -84,8 +85,8 @@ def odds_changed(existing, new):
 # -----------------------------
 for game in games:
     commence_time = datetime.fromisoformat(game["commence_time"]).replace(tzinfo=pytz.utc)
-    commence_et = commence_time.astimezone(pytz.timezone("US/Eastern"))
-    if commence_et.date() != datetime.now(pytz.timezone("US/Eastern")).date():
+    commence_et = commence_time.astimezone(eastern)
+    if commence_et.date() != today_et:
         continue  # Skip games not on current ET calendar day
     if commence_time <= cutoff_time:
         continue  # Skip games starting within 1 hour
@@ -124,7 +125,7 @@ for game in games:
 
     row = {
         "game_id": game_id,
-        "game_time": game["commence_time"],
+        "game_time": commence_et.isoformat(),
         "home_team": home_team,
         "away_team": away_team,
         "home_team_number": home_team_number,
