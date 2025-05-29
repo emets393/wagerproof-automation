@@ -11,11 +11,9 @@ supabase: Client = create_client(url, key)
 
 # Today's date
 today = datetime.today().strftime('%Y-%m-%d')
-date_str = pd.to_datetime(today).strftime("%Y%m%d")
 
 # Fetch team mapping (full name -> short name, number)
 team_map_resp = supabase.table("mlb_teams").select("full_name, short_name, team_number").execute()
-
 team_map = {
     t["full_name"]: {
         "short": t["short_name"],
@@ -41,7 +39,8 @@ for game in games:
     home_data = team_map.get(home_full, {"short": home_full, "number": None})
     away_data = team_map.get(away_full, {"short": away_full, "number": None})
 
-    unique_id = f"{home_data['short']}{away_data['short']}{date_str}"
+    # Use gamePk as unique_id to handle doubleheaders
+    unique_id = str(game['gamePk'])
 
     row = {
         "date": today,
