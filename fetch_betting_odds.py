@@ -11,108 +11,109 @@ SPORT = "baseball_mlb"
 SPORTSBOOK = "draftkings"
 REGIONS = "us"
 MARKETS = "spreads,h2h,totals"
-ODDS_URL = f"https://odds.p.rapidapi.com/v4/sports/{SPORT}/odds"
+import requests
+from datetime import datetime
+import os
+from supabase import create_client, Client
 
-# Supabase setup
-supabase_url = os.getenv("SUPABASE_URL")
-supabase_key = os.getenv("SUPABASE_KEY")
-supabase: Client = create_client(supabase_url, supabase_key)
+# --------------------------
+# Setup
+# --------------------------
+url = os.getenv("SUPABASE_URL")
+key = os.getenv("SUPABASE_KEY")
+odds_api_key = os.getenv("ODDS_API_KEY")
+supabase: Client = create_client(url, key)
 
-# Today's date
-today = datetime.today().strftime('%Y-%m-%d')
-
-# -----------------------------
-# Fetch team mapping
-# -----------------------------
+# --------------------------
+# Fetch team name mapping
+# --------------------------
 team_map_resp = supabase.table("mlb_teams").select("full_name, short_name, team_number").execute()
 team_map = {
-    t["full_name"]: {"short": t["short_name"], "number": t["team_number"]}
+    t["full_name"]: {
+        "short": t["short_name"],
+        "number": t["team_number"]
+    }
     for t in team_map_resp.data
 }
 
-# -----------------------------
-# Fetch odds data
-# -----------------------------
-response = requests.get(
-    f"{ODDS_URL}?regions={REGIONS}&markets={MARKETS}&oddsFormat=american&dateFormat=iso",
-    headers={
-        "x-rapidapi-key": RAPIDAPI_KEY,
-        "x-rapidapi-host": "odds.p.rapidapi.com"
-    }
-)
+# --------------------------
+# Get today's date
+# --------------------------
+today = datetime.today().strftime('%Y-%m-%d')
+
+# --------------------------
+# Fetch odds from API
+# --------------------------
+odds_url = "https://api.the-odds-api.com/v4/sports/baseball_mlb/odds"
+params = {
+    "regions": "us",
+    "markets": "spreads,h2h,totals",
+    "oddsFormat": "american",
+    "dateFormat": "iso",
+    "apiKey": odds_api_key
+}
+
+response = requests.get(odds_url, params=params)
+if response.status_code != 200:
+    raise Exception(f"Failed to fetch odds: {response.status_code} {response.text}")
 
 odds_data = response.json()
 
-# -----------------------------
-# Process and Insert Odds
-# -----------------------------
+# --------------------------
+# Insert odds into Supabase
+# --------------------------
 for game in odds_data:
-    teams = game.get("teams", [])
-    home_team = game.get("home_team", "")
-    away_team = [t for t in teams if t != home_team][0] if len(teams) == 2 else ""
+    try:
+        home_team_full = game["home_team"]
+        away_team_full = game["away_team"]
+        game_time = game["commence_time"]
+        game_pk = game["id"]  # Use API game id as unique game ID
 
-    bookmaker = next((b for b in game.get("bookmakers", []) if b["key"] == SPORTSBOOK), None)
-    if not bookmaker:
-        continue
+        # Map to short name and number
+        home = team_map.get(home_team_full, {"short": home_team_full, "number": None})
+        away = team_map.get(away_team_full, {"short": away_team_full, "number": None})
 
-    game_id = str(game["id"])
-    game_date = game["commence_time"][:10]
+        # Extract odds (from first bookmaker only, adjust as needed)
+        bookmaker = game.get("bookmakers", [])[0] if game.get("bookmakers") else {}
+        markets = bookmaker.get("markets", []) if bookmaker else []
 
-    # Get mapped names
-    home_info = team_map.get(home_team, {"short": home_team, "number": None})
-    away_info = team_map.get(away_team, {"short": away_team, "number": None})
+        spread, moneyline, total = None, None, None
+        for market in markets:
+            if market["key"] == "spreads":
+                spread = market["outcomes"]
+            elif market["key"] == "h2h":
+                moneyline = market["outcomes"]
+            elif market["key"] == "totals":
+                total = market["outcomes"]
 
-    # Initialize values
-    home_spread = home_spread_odds = away_spread = away_spread_odds = None
-    home_moneyline = away_moneyline = over_under_total = over_odds = under_odds = None
+        def get_outcome_price(outcomes, team_name=None):
+            if not outcomes:
+                return None
+            if team_name:
+                for o in outcomes:
+                    if o.get("name") == team_name:
+                        return o.get("price")
+            return outcomes[0].get("price")  # fallback
 
-    for market in bookmaker["markets"]:
-        if market["key"] == "spreads":
-            for outcome in market["outcomes"]:
-                if outcome["name"] == home_team:
-                    home_spread = outcome.get("point")
-                    home_spread_odds = outcome.get("price")
-                elif outcome["name"] == away_team:
-                    away_spread = outcome.get("point")
-                    away_spread_odds = outcome.get("price")
-        elif market["key"] == "h2h":
-            for outcome in market["outcomes"]:
-                if outcome["name"] == home_team:
-                    home_moneyline = outcome.get("price")
-                elif outcome["name"] == away_team:
-                    away_moneyline = outcome.get("price")
-        elif market["key"] == "totals":
-            for outcome in market["outcomes"]:
-                over_under_total = outcome.get("point")
-                if outcome["name"].lower() == "over":
-                    over_odds = outcome.get("price")
-                elif outcome["name"].lower() == "under":
-                    under_odds = outcome.get("price")
+        row = {
+            "game_pk": game_pk,
+            "date": today,
+            "game_time": game_time,
+            "home_team": home["short"],
+            "home_team_number": home["number"],
+            "away_team": away["short"],
+            "away_team_number": away["number"],
+            "home_spread": next((o["point"] for o in spread if o["name"] == home_team_full), None) if spread else None,
+            "home_spread_odds": get_outcome_price(spread, home_team_full),
+            "away_spread": next((o["point"] for o in spread if o["name"] == away_team_full), None) if spread else None,
+            "away_spread_odds": get_outcome_price(spread, away_team_full),
+            "home_moneyline": get_outcome_price(moneyline, home_team_full),
+            "away_moneyline": get_outcome_price(moneyline, away_team_full),
+            "over_under_total": next((o["point"] for o in total if o["name"] == "Over"), None) if total else None,
+        }
 
-    row = {
-        "game_id": game_id,
-        "game_date": game_date,
-        "home_team": home_info["short"],
-        "home_team_number": home_info["number"],
-        "away_team": away_info["short"],
-        "away_team_number": away_info["number"],
-        "sportsbook": SPORTSBOOK,
+        supabase.table("betting_lines").upsert(row, on_conflict=["game_pk"]).execute()
 
-        "home_spread": home_spread,
-        "home_spread_odds": home_spread_odds,
-        "away_spread": away_spread,
-        "away_spread_odds": away_spread_odds,
-        "home_moneyline": home_moneyline,
-        "away_moneyline": away_moneyline,
-        "over_under_total": over_under_total,
-        "over_odds": over_odds,
-        "under_odds": under_odds
-    }
+    except Exception as e:
+        print(f"Error processing game: {e}")
 
-    # Insert first odds if not exists
-    existing_first = supabase.table("mlb_betting_odds").select("id").eq("game_id", game_id).eq("odds_type", "first").eq("sportsbook", SPORTSBOOK).execute()
-    if not existing_first.data:
-        supabase.table("mlb_betting_odds").insert({**row, "odds_type": "first"}).execute()
-
-    # Upsert last odds
-    supabase.table("mlb_betting_odds").upsert({**row, "odds_type": "last"}, on_conflict=["game_id", "odds_type", "sportsbook"]).execute()
