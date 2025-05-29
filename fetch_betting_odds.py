@@ -87,9 +87,9 @@ for game in games:
     commence_time = datetime.fromisoformat(game["commence_time"]).replace(tzinfo=pytz.utc)
     commence_et = commence_time.astimezone(eastern)
     if commence_et.date() != today_et:
-        continue  # Skip games not on current ET calendar day
+        continue
     if commence_time <= cutoff_time:
-        continue  # Skip games starting within 1 hour
+        continue
 
     game_id = game["id"]
     home_team_long = game["home_team"]
@@ -140,27 +140,29 @@ for game in games:
         "over_price": over_data.get("price"),
         "under_point": under_data.get("point"),
         "under_price": under_data.get("price"),
-        "first_fetched": now_iso,
-        "last_fetched": now_iso,
+        "fetched_at": now_iso
     }
 
     # --- Upsert into live odds table ---
     supabase.table("mlb_betting_lines").upsert(row, on_conflict=["game_id"]).execute()
 
-    # --- Handle history table ---
-    existing_history = supabase.table("mlb_betting_lines_history").select("*").eq("game_id", game_id).execute().data
-    if not existing_history:
+    # --- Insert into history table ---
+    history_rows = supabase.table("mlb_betting_lines_history").select("*").eq("game_id", game_id).order("fetched_at").execute().data
+    if not history_rows:
+        row["first_fetched"] = now_iso
+        row["last_fetched"] = None
         supabase.table("mlb_betting_lines_history").insert(row).execute()
-        print(f"🆕 Added to history: {home_team} vs {away_team}")
+        print(f"🆕 First fetch history: {home_team} vs {away_team}")
     else:
-        existing_row = existing_history[0]
-        if odds_changed(existing_row, row):
-            updated_row = row.copy()
-            updated_row["first_fetched"] = existing_row["first_fetched"]
-            supabase.table("mlb_betting_lines_history").upsert(updated_row, on_conflict=["game_id"]).execute()
-            print(f"🔁 Updated history (odds changed): {home_team} vs {away_team}")
+        last_row = history_rows[-1]
+        if odds_changed(last_row, row):
+            row["first_fetched"] = None
+            row["last_fetched"] = now_iso
+            supabase.table("mlb_betting_lines_history").insert(row).execute()
+            print(f"🔁 Added last fetch history: {home_team} vs {away_team}")
         else:
             print(f"⏸ No update needed for: {home_team} vs {away_team}")
+
 
 
 
