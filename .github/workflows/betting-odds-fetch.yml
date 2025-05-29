@@ -8,9 +8,6 @@ on:
 jobs:
   fetch-odds:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ${{ github.workspace }}
 
     steps:
       - name: Checkout repository
@@ -33,5 +30,6 @@ jobs:
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
         run: |
           python fetch_betting_odds.py
+
 
 
