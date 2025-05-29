@@ -1,0 +1,35 @@
+name: Fetch Betting Odds
+
+on:
+  schedule:
+    - cron: '0 13 * * *'  # 8am ET
+    - cron: '0 15 * * *'  # 10am ET
+    - cron: '0 17 * * *'  # 12pm ET
+    - cron: '0 19 * * *'  # 2pm ET
+    - cron: '0 21 * * *'  # 4pm ET
+    - cron: '0 23 * * *'  # 6pm ET
+  workflow_dispatch:
+
+jobs:
+  fetch-odds:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests supabase pandas
+
+      - name: Run betting odds script
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python fetch_betting_odds.py
