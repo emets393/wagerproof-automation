@@ -23,9 +23,18 @@ jobs:
         python -m pip install --upgrade pip
         pip install pandas numpy requests beautifulsoup4 supabase
 
+    - name: 🔍 Debug: Check if Supabase secrets are passed
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      run: |
+        echo "🔍 SUPABASE_URL length: ${#SUPABASE_URL}"
+        echo "🔍 SUPABASE_KEY length: ${#SUPABASE_KEY}"
+
     - name: ▶️ Run TeamRankings scraper
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
       run: |
         python schedules_results_scraper.py
+
