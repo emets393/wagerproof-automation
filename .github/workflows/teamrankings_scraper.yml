@@ -28,8 +28,8 @@ jobs:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
       run: |
-        echo "🔍 SUPABASE_URL length: ${#SUPABASE_URL}"
-        echo "🔍 SUPABASE_KEY length: ${#SUPABASE_KEY}"
+        echo "🔍 SUPABASE_URL is set: ${SUPABASE_URL:+yes}"
+        echo "🔍 SUPABASE_KEY is set: ${SUPABASE_KEY:+yes}"
 
     - name: ▶️ Run TeamRankings scraper
       env:
@@ -37,4 +37,5 @@ jobs:
         SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
       run: |
         python schedules_results_scraper.py
+
 
