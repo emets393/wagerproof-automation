@@ -1,0 +1,41 @@
+name: Full Training Data Pipeline
+
+on:
+  schedule:
+    - cron: '0 19 * * *'   # 3:00pm EST
+    - cron: '0 23 * * *'   # 7:00pm EST
+    - cron: '0 6 * * *'    # 2:00am EST
+  workflow_dispatch:
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas selenium beautifulsoup4 supabase regex webdriver-manager
+
+      - name: Run teamrankings_scraper.py
+        run: python teamrankings_scraper.py
+
+      - name: Run update_ou_result_batch.py
+        run: python update_ou_result_batch.py
+
+      - name: Run update_series_results.py
+        run: python update_series_results.py
+
+      - name: Run viewtotrainimport.py
+        run: python viewtotrainimport.py
+
+      - name: Run trainingresultsupdate.py
+        run: python trainingresultsupdate.py
