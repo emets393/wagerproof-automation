@@ -1,0 +1,70 @@
+Input Values View,,,,Training Data,,,,,,,,,,,,,,,,,,,,
+Match ID,column_name,data_type,Notes,Match ID,column_name,data_type,notes,,,,,,,,,,,,,,,,,
+1,date,date,yyyy-mm-dd,2,unique_id,text,,,,,,,,,,,,,,,,,,
+2,unique_id,text,,1,Game Date,bigint,excel numerical formal,,,,,,,,1,date,1,Game Date,,,,date,Game Date,date
+3,home_team,text,,3,Home Team,text,,,,,,,,,2,unique_id,2,unique_id,,,,unique_id,unique_id,text
+4,away_team,text,,41,Home Team Number,bigint,,,,,,,,,3,home_team,3,Home Team,,,,home_team,Home Team,text
+5,home_ml,integer,,4,Away Team,text,,,,,,,,,4,away_team,4,Away Team,,,,away_team,Away Team,text
+6,away_ml,integer,,44,Away Team Number,bigint,,,,,,,,,5,home_ml,5,Home ML,,,,home_ml,Home ML,integer
+7,home_rl,numeric,,49,Series Game Number,bigint,,,,,,,,,6,away_ml,6,Away ML,,,,away_ml,Away ML,integer
+8,away_rl,numeric,,50,Series Home Wins,bigint,,,,,,,,,7,home_rl,7,Home RL,,,,home_rl,Home RL,numeric
+9,home_ml_handle,numeric,,57,Series Away Win,bigint,,,,,,,,,8,away_rl,8,Away RL,,,,away_rl,Away RL,numeric
+10,away_ml_handle,numeric,,55,Series Overs,bigint,,,,,,,,,9,home_ml_handle,9,Home ML Handle,,,,home_ml_handle,Home ML Handle,numeric
+11,home_ml_bets,numeric,,56,Series Unders,bigint,,,,,,,,,10,away_ml_handle,10,Away ML Handle,,,,away_ml_handle,Away ML Handle,numeric
+12,away_ml_bets,numeric,,17,O/U Line,double precision,,,,,,,,,11,home_ml_bets,11,Home ML Bet,,,,home_ml_bets,Home ML Bet,numeric
+13,home_rl_handle,numeric,,5,Home ML,bigint,,,,,,,,,12,away_ml_bets,12,Away ML Bet,,,,away_ml_bets,Away ML Bet,numeric
+14,away_rl_handle,numeric,,7,Home RL,double precision,,,,,,,,,13,home_rl_handle,13,Home Spread Handle,,,,home_rl_handle,Home Spread Handle,numeric
+15,home_rl_bets,numeric,,9,Home ML Handle,double precision,,,,,,,,,14,away_rl_handle,14,Away Spread Handle,,,,away_rl_handle,Away Spread Handle,numeric
+16,away_rl_bets,numeric,,11,Home ML Bet,double precision,,,,,,,,,15,home_rl_bets,15,Home Spread Bet,,,,home_rl_bets,Home Spread Bet,numeric
+17,o_u_line,numeric,,13,Home Spread Handle,double precision,,,,,,,,,16,away_rl_bets,16,Away Spread Bet,,,,away_rl_bets,Away Spread Bet,numeric
+18,season,integer,,15,Home Spread Bet,double precision,,,,,,,,,17,o_u_line,17,O/U Line,,,,o_u_line,O/U Line,numeric
+19,month,integer,,6,Away ML,bigint,,,,,,,,,18,season,18,Season,,,,season,Season,integer
+20,day,integer,,8,Away RL,double precision,,,,,,,,,19,month,19,Month,,,,month,Month,integer
+21,excel_date,integer,,10,Away ML Handle,double precision,,,,,,,,,20,day,20,Day,,,,day,Day,integer
+22,unique_home_team_id,text,,12,Away ML Bet,double precision,,,,,,,,,22,unique_home_team_id,22,Home Team ID,,,,unique_home_team_id,Home Team ID,text
+23,unique_away_team_id,text,,14,Away Spread Handle,double precision,,,,,,,,,23,unique_away_team_id,23,Away Team ID,,,,unique_away_team_id,Away Team ID,text
+24,start_time_minutes,numeric,,16,Away Spread Bet,double precision,,,,,,,,,25,home_pitcher,25,Home Pitcher,,,,home_pitcher,Home Pitcher,text
+25,home_pitcher,text,,62,Over Handle,double precision,,,,,,,,,26,away_pitcher,26,Away Pitcher,,,,away_pitcher,Away Pitcher,text
+26,away_pitcher,text,,63,Over Bets,double precision,,,,,,,,,27,home_era,27,Home ERA,,,,home_era,Home ERA,numeric
+27,home_era,numeric,,48,Divisional Game,bigint,,,,,,,,,28,away_era,28,Away ERA,,,,away_era,Away ERA,numeric
+28,away_era,numeric,,47,League Game,bigint,,,,,,,,,29,home_whip,29,Home Whip,,,,home_whip,Home Whip,numeric
+29,home_whip,numeric,,51,Home Streak,bigint,,,,,,,,,30,away_whip,30,Away Whip,,,,away_whip,Away Whip,numeric
+30,away_whip,numeric,,58,Away Streak,bigint,,,,,,,,,31,home_handedness,31,Home Pitcher Hand,,,,home_handedness,Home Pitcher Hand,integer
+31,home_handedness,integer,,37,Home Winning %,double precision,,,,,,,,,32,away_handedness,32,Away Pitcher Hand,,,,away_handedness,Away Pitcher Hand,integer
+32,away_handedness,integer,,38,Away Winning %,double precision,,,,,,,,,33,home_pitcher_id,33,Home Pitcher ID,,,,home_pitcher_id,Home Pitcher ID,integer
+33,home_pitcher_id,integer,,52,Home Last W/L,bigint,,,,,,,,,34,away_pitcher_id,34,Away Pitcher ID,,,,away_pitcher_id,Away Pitcher ID,integer
+34,away_pitcher_id,integer,,59,Away Last W/L,bigint,,,,,,,,,35,home_team_last_3,35,Home Last3 OB+Slug,,,,home_team_last_3,Home Last3 OB+Slug,numeric
+35,home_team_last_3,numeric,,53,Home Last Game Runs,bigint,,,,,,,,,36,away_team_last_3,36,Away Last3 OB+Slug,,,,away_team_last_3,Away Last3 OB+Slug,numeric
+36,away_team_last_3,numeric,,60,Away Last Game Runs,bigint,,,,,,,,,37,home_win_pct,37,Home Winning %,,,,home_win_pct,Home Winning %,numeric
+37,home_win_pct,numeric,,54,Home Last Game Runs Allowed,bigint,,,,,,,,,38,away_win_pct,38,Away Winning %,,,,away_win_pct,Away Winning %,numeric
+38,away_win_pct,numeric,,61,Away Last Game Runs Allowed,bigint,,,,,,,,,39,home_ops_last_3,39,Home Last3 Opp OB+Slug,,,,home_ops_last_3,Home Last3 Opp OB+Slug,numeric
+39,home_ops_last_3,numeric,,39,Home Last3 Opp OB+Slug,double precision,,,,,,,,,40,away_ops_last_3,40,Away Last3 Opp OB+Slug,,,,away_ops_last_3,Away Last3 Opp OB+Slug,numeric
+40,away_ops_last_3,numeric,,40,Away Last3 Opp OB+Slug,double precision,,,,,,,,,41,home_team_number,41,Home Team Number,,,,home_team_number,Home Team Number,bigint
+41,home_team_number,bigint,,35,Home Last3 OB+Slug,double precision,,,,,,,,,42,home_league_number,42,Home League,,,,home_league_number,Home League,bigint
+42,home_league_number,bigint,,36,Away Last3 OB+Slug,double precision,,,,,,,,,43,home_division_number,43,Home Div,,,,home_division_number,Home Div,bigint
+43,home_division_number,bigint,,18,Season,bigint,,,,,,,,,44,away_team_number,44,Away Team Number,,,,away_team_number,Away Team Number,bigint
+44,away_team_number,bigint,,19,Month,bigint,,,,,,,,,45,away_league_number,45,Away League,,,,away_league_number,Away League,bigint
+45,away_league_number,bigint,,20,Day,bigint,,,,,,,,,46,away_division_number,46,Away Div,,,,away_division_number,Away Div,bigint
+46,away_division_number,bigint,,25,Home Pitcher,text,,,,,,,,,47,same_league,47,League Game,,,,same_league,League Game,integer
+47,same_league,integer,,33,Home Pitcher ID,bigint,,,,,,,,,48,same_division,48,Divisional Game,,,,same_division,Divisional Game,integer
+48,same_division,integer,,29,Home Whip,double precision,,,,,,,,,49,series_game_number,49,Series Game Number,,,,series_game_number,Series Game Number,integer
+49,series_game_number,integer,,27,Home ERA,double precision,,,,,,,,,50,series_home_wins,50,Series Home Wins,,,,series_home_wins,Series Home Wins,integer
+50,series_home_wins,integer,,26,Away Pitcher,text,,,,,,,,,51,streak,51,Home Streak,,,,streak,Home Streak,integer
+51,streak,integer,,34,Away Pitcher ID,bigint,,,,,,,,,52,home_last_win,52,Home Last W/L,,,,home_last_win,Home Last W/L,integer
+52,home_last_win,integer,,30,Away Whip,double precision,,,,,,,,,53,home_last_runs,53,Home Last Game Runs,,,,home_last_runs,Home Last Game Runs,integer
+53,home_last_runs,integer,,28,Away ERA,double precision,,,,,,,,,54,home_last_runs_allowed,54,Home Last Game Runs Allowed,,,,home_last_runs_allowed,Home Last Game Runs Allowed,integer
+54,home_last_runs_allowed,integer,,31,Home Pitcher Hand,bigint,,,,,,,,,55,series_overs,55,Series Overs,,,,series_overs,Series Overs,integer
+55,series_overs,integer,,32,Away Pitcher Hand,bigint,,,,,,,,,56,series_unders,56,Series Unders,,,,series_unders,Series Unders,integer
+56,series_unders,integer,,,Home Team ID,text,this is the team name and the last 6 characters of the unique id so the numbers in the unique id,,,,,,,,57,series_away_wins,57,Series Away Win,,,,series_away_wins,Series Away Win,integer
+57,series_away_wins,integer,,,Away Team ID,text,this is the team name and the last 6 characters of the unique id so the numbers in the unique id,,,,,,,,58,away_streak,58,Away Streak,,,,away_streak,Away Streak,integer
+58,away_streak,integer,,,Home Score,bigint,This will be found by looking at the home team and then mapping it to the correct home_teams table and looking for the team_score column that whose join_table_string matches the unique id in input_view_tables,,,,,,,,59,away_last_win,59,Away Last W/L,,,,away_last_win,Away Last W/L,integer
+59,away_last_win,integer,,,Away Score,text,This will be found by looking at the home team and then mapping it to the correct home_teams table and looking for the opponent_score column whose join_table_string matches the unique id in input_view_tables,,,,,,,,60,away_last_runs,60,Away Last Game Runs,,,,away_last_runs,Away Last Game Runs,integer
+60,away_last_runs,integer,,,ou_result,integer,"this will be a formula of home score + away score. If its bigger than or equal to the O/U Line then its 1, if its less than then its 0",,,,,,,,61,away_last_runs_allowed,61,Away Last Game Runs Allowed,,,,away_last_runs_allowed,Away Last Game Runs Allowed,integer
+61,away_last_runs_allowed,integer,,,Run Line H/A Winner,integer,this will be a formula of home score + away score. If the Home RL is -1.5 then they have to win by 2 or more if its 1.5 then they cant lose by more than 1. If the home team covers put 1 if the away team covers put 0,,,,,,,,62,ou_handle_over,62,Over Handle,,,,ou_handle_over,Over Handle,numeric
+62,ou_handle_over,numeric,,,Home/Away Winner,integer,"This one is simple if the home score is higher than the away score put 1 , otherwise put 0",,,,,,,,63,ou_bets_over,63,Over Bets,,,,ou_bets_over,Over Bets,numeric
+63,ou_bets_over,numeric,,43,Home Div,bigint,,,,,,,,,,,,Home Score,,,,,,
+,,,,46,Away Div,bigint,,,,,,,,,,,,Away Score,,,,,,
+,,,,42,Home League,bigint,,,,,,,,,,,,ou_result,,,,,,
+,,,,45,Away League,bigint,,,,,,,,,,,,Run Line H/A Winner,,,,,,
+,,,,,data_source,text,where the data came from,,,,,,,,,,,Home/Away Winner,,,,,,
+,,,,,,,,,,,,,,,,,,data_source,,,,,,
