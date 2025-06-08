@@ -11,9 +11,10 @@ import traceback
 # -----------------------------
 # Supabase credentials
 # -----------------------------
-url = "https://gnjrklxotmbvnxbnnqgq.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImduanJrbHhvdG1idm54Ym5ucWdxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0Nzc1OTQ0NywiZXhwIjoyMDYzMzM1NDQ3fQ.sMh6lWpp3OLvwJLZft0CqS5nyMNo8xuxQcL4GLOXZ4w"
-supabase: Client = create_client(url, SUPABASE_KEY)
+url = os.getenv("SUPABASE_URL")
+key = os.getenv("SUPABASE_KEY")
+
+supabase: Client = create_client(url, key)
 
 # -----------------------------
 # Team mapping manually defined
