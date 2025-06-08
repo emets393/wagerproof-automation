@@ -2,8 +2,8 @@ name: 🕕 Daily TeamRankings Scraper
 
 on:
   schedule:
-    - cron: '0 10 * * *'  # Runs at 6:00 AM EST every day
-  workflow_dispatch:
+    - cron: '0 10 * * *'  # Runs at 6:00 AM EST (10:00 UTC)
+  workflow_dispatch:      # Allows manual trigger in GitHub UI
 
 jobs:
   run-scraper:
@@ -12,11 +12,6 @@ jobs:
     steps:
     - name: 📥 Checkout repo
       uses: actions/checkout@v3
-
-    - name: 🔄 Force pull latest changes
-      run: |
-        git fetch --all
-        git reset --hard origin/main
 
     - name: 🐍 Set up Python
       uses: actions/setup-python@v4
@@ -33,4 +28,5 @@ jobs:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
       run: |
-        python schedules_results_scraper.py
+        python teamrankings_scraper.py
+
