@@ -1,15 +1,15 @@
-name: Run DraftKings Line Scraper
+name: Run DraftKings Lines Scraper
 
 on:
   schedule:
-    - cron: '0 12 * * *'  # 8:00am EST
-    - cron: '0 14 * * *'  # 10:00am EST
-    - cron: '0 16 * * *'  # 12:00pm EST
-    - cron: '0 18 * * *'  # 2:00pm EST
-    - cron: '0 20 * * *'  # 4:00pm EST
-    - cron: '0 22 * * *'  # 6:00pm EST
-    - cron: '0 0 * * *'   # 8:00pm EST
-    - cron: '0 2 * * *'   # 10:00pm EST
+    - cron: '0 12 * * *'  # 8am EST
+    - cron: '0 14 * * *'  # 10am EST
+    - cron: '0 16 * * *'  # 12pm EST
+    - cron: '0 18 * * *'  # 2pm EST
+    - cron: '0 20 * * *'  # 4pm EST
+    - cron: '0 22 * * *'  # 6pm EST
+    - cron: '0 0 * * *'   # 8pm EST
+    - cron: '0 2 * * *'   # 10pm EST
   workflow_dispatch:
 
 jobs:
@@ -17,27 +17,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📥 Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: 🐍 Set up Python
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
-      - name: 🧰 Install system dependencies (Chrome & ChromeDriver)
-        run: |
-          sudo apt update
-          sudo apt install -y chromium-browser chromium-chromedriver
-          sudo ln -s /usr/bin/chromedriver /usr/local/bin/chromedriver
-
-      - name: 📦 Install Python packages
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pandas regex selenium beautifulsoup4 supabase lxml
+          pip install pandas selenium beautifulsoup4 supabase regex webdriver-manager
 
-      - name: ▶️ Run script
-        env:
-          PYTHONUNBUFFERED: 1
+      - name: Install Chrome
+        run: |
+          sudo apt update
+          sudo apt install -y google-chrome-stable
+
+      - name: Run script
         run: python draftkings_lines.py
 
