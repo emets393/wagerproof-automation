@@ -1,4 +1,4 @@
-#---updated Draftkings lines to only get lines for today's current date (updated on)
+# --- DraftKings lines scraper for today's current date only ---
 
 import re
 import regex as re2
@@ -6,6 +6,8 @@ import pandas as pd
 from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 import time
 from supabase import create_client, Client
@@ -19,7 +21,13 @@ TABLE_NAME = "draftkings_lines"
 # ------------------ Load VSIN Page ------------------
 options = Options()
 options.add_argument('--headless')
-driver = webdriver.Chrome(options=options)
+options.add_argument('--no-sandbox')
+options.add_argument('--disable-dev-shm-usage')
+
+# ✅ Use WebDriver Manager to ensure correct driver is used
+service = Service(ChromeDriverManager().install())
+driver = webdriver.Chrome(service=service, options=options)
+
 driver.get("https://data.vsin.com/betting-splits/?bookid=dk&view=mlb")
 time.sleep(10)
 soup = BeautifulSoup(driver.page_source, 'html.parser')
