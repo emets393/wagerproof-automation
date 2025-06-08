@@ -28,7 +28,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pandas supabase lxml
+          pip install pandas supabase lxml regex
+
 
       - name: Run draftkings_lines.py
         run: python draftkings_lines.py
