@@ -7,6 +7,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from supabase import create_client, Client
 import traceback
+import os
 
 # -----------------------------
 # Supabase credentials
