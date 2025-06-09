@@ -14,7 +14,6 @@ url = "https://gnjrklxotmbvnxbnnqgq.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImduanJrbHhvdG1idm54Ym5ucWdxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0OTQwMzM5MywiZXhwIjoyMDY0OTc5MzkzfQ.RGi1Br_luWhexvBJJC1AaMSEMHJGl9Li_NUlwiUshsA"
 supabase: Client = create_client(url, SUPABASE_KEY)
 
-
 # -----------------------------
 # Step 1: Fetch Data
 # -----------------------------
@@ -73,11 +72,24 @@ for col in categorical_features:
     input_data[col] = input_data[col].apply(lambda x: le.transform([x])[0] if x in le.classes_ else -1)
 
 # -----------------------------
-# Step 4: Train Models (with regularization)
-# -----------------------------
-# -----------------------------
 # Step 4 + 5: Train on split, evaluate tier accuracy cleanly
 # -----------------------------
+X = training_data[features]
+y_ou = training_data[target_ou_result]
+y_rl = training_data[target_run_line_winner]
+y_ha = training_data[target_ha_winner]
+
+xgb_config = {
+    "use_label_encoder": False,
+    "eval_metric": "logloss",
+    "n_estimators": 100,
+    "max_depth": 3,
+    "learning_rate": 0.1,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "random_state": 42
+}
+
 def calculate_tier_accuracy(y_true, probs):
     tiers = [(i / 10, (i + 1) / 10) for i in range(10)]
     results = []
@@ -97,7 +109,6 @@ def get_tier_accuracy(prob, tier_accs):
             return acc
     return None
 
-# Split first, THEN train and evaluate
 X_ou_train, X_ou_test, y_ou_train, y_ou_test = train_test_split(X, y_ou, test_size=0.3, stratify=y_ou, random_state=42)
 X_rl_train, X_rl_test, y_rl_train, y_rl_test = train_test_split(X, y_rl, test_size=0.3, stratify=y_rl, random_state=42)
 X_ha_train, X_ha_test, y_ha_train, y_ha_test = train_test_split(X, y_ha, test_size=0.3, stratify=y_ha, random_state=42)
@@ -116,6 +127,13 @@ model_ha = xgb.XGBClassifier(**xgb_config)
 model_ha.fit(X_ha_train, y_ha_train)
 probs_ha = model_ha.predict_proba(X_ha_test)[:, 1]
 tier_acc_ha = calculate_tier_accuracy(y_ha_test, probs_ha)
+
+print("\n🔍 OU Tier Accuracy:")
+for t in tier_acc_ou: print(t)
+print("\n🔍 RL Tier Accuracy:")
+for t in tier_acc_rl: print(t)
+print("\n🔍 HA Tier Accuracy:")
+for t in tier_acc_ha: print(t)
 
 # -----------------------------
 # Step 6: Make Predictions
@@ -147,3 +165,4 @@ for i in range(len(input_data)):
 
 supabase.table("daily_combined_predictions").upsert(results, on_conflict=["unique_id"]).execute()
 print(f"✅ Uploaded {len(results)} predictions to Supabase.")
+
