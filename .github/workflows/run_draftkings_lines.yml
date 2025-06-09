@@ -28,7 +28,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pandas selenium beautifulsoup4 supabase regex webdriver-manager requests
+          pip install pandas selenium beautifulsoup4 supabase regex webdriver-manager requests scikit-learn xgboost
 
       - name: Install Chrome
         run: |
@@ -40,5 +40,9 @@ jobs:
 
       - name: Run Pitcher Stats uploader
         run: python pitcher_stats_uploader.py
+
+      - name: Run Prediction Model
+        run: python prediction_model.py
+
 
 
