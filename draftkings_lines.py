@@ -70,7 +70,7 @@ team_map = {
     "Detroit Tigers": "Detroit", "Houston Astros": "Houston", "Kansas City Royals": "Kansas City",
     "Los Angeles Angels": "Angels", "Los Angeles Dodgers": "Dodgers", "Miami Marlins": "Miami",
     "Milwaukee Brewers": "Milwaukee", "Minnesota Twins": "Minnesota", "New York Mets": "Mets",
-    "New York Yankees": "Yankees", "Oakland Athletics": "Athletics", "Philadelphia Phillies": "Philadelphia",
+    "New York Yankees": "Yankees", "Athletics": "Athletics", "Philadelphia Phillies": "Philadelphia",
     "Pittsburgh Pirates": "Pittsburgh", "San Diego Padres": "San Diego", "San Francisco Giants": "San Francisco",
     "Seattle Mariners": "Seattle", "Tampa Bay Rays": "Tampa Bay",
     "Texas Rangers": "Texas", "Toronto Blue Jays": "Toronto", "Washington Nationals": "Washington",
