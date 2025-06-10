@@ -24,7 +24,7 @@ training_data_resp = supabase.table("training_data").select("*").execute()
 training_data = pd.DataFrame(training_data_resp.data)
 training_data = training_data[pd.to_datetime(training_data['date']).dt.date < today]
 
-print(f"📊 Total rows in training data before modeling: {len(training_data)}")
+print(f"\U0001f4ca Total rows in training data before modeling: {len(training_data)}")
 
 # Input Data
 input_data_resp = supabase.table("input_values_view").select("*").execute()
@@ -109,6 +109,15 @@ def get_tier_accuracy(prob, tier_accs):
             return acc
     return None
 
+def get_prediction(prob, tier_acc, pos_label, neg_label):
+    base = pos_label if prob >= 0.5 else neg_label
+    if tier_acc is None:
+        return base
+    return base if tier_acc >= 0.5 else (neg_label if base == pos_label else pos_label)
+
+def get_strength(tier_acc):
+    return "strong" if tier_acc is not None and (tier_acc >= 0.55 or tier_acc <= 0.45) else "basic"
+
 X_ou_train, X_ou_test, y_ou_train, y_ou_test = train_test_split(X, y_ou, test_size=0.3, stratify=y_ou, random_state=42)
 X_rl_train, X_rl_test, y_rl_train, y_rl_test = train_test_split(X, y_rl, test_size=0.3, stratify=y_rl, random_state=42)
 X_ha_train, X_ha_test, y_ha_train, y_ha_test = train_test_split(X, y_ha, test_size=0.3, stratify=y_ha, random_state=42)
@@ -149,6 +158,14 @@ prob_ha = model_ha.predict_proba(X_input)[:, 1]
 results = []
 for i in range(len(input_data)):
     row = input_data.iloc[i]
+    ou_acc = get_tier_accuracy(prob_ou[i], tier_acc_ou)
+    rl_acc = get_tier_accuracy(prob_rl[i], tier_acc_rl)
+    ha_acc = get_tier_accuracy(prob_ha[i], tier_acc_ha)
+
+    ou_pred = get_prediction(prob_ou[i], ou_acc, "Over", "Under")
+    rl_pred = get_prediction(prob_rl[i], rl_acc, row['home_team'], row['away_team'])
+    ha_pred = get_prediction(prob_ha[i], ha_acc, row['home_team'], row['away_team'])
+
     results.append({
         "unique_id": row['unique_id'],
         "game_date": row['date'],
@@ -157,12 +174,18 @@ for i in range(len(input_data)):
         "ou_probability": float(prob_ou[i]),
         "run_line_probability": float(prob_rl[i]),
         "ml_probability": float(prob_ha[i]),
-        "ou_tier_accuracy": get_tier_accuracy(prob_ou[i], tier_acc_ou),
-        "run_line_tier_accuracy": get_tier_accuracy(prob_rl[i], tier_acc_rl),
-        "ml_tier_accuracy": get_tier_accuracy(prob_ha[i], tier_acc_ha),
+        "ou_tier_accuracy": ou_acc,
+        "run_line_tier_accuracy": rl_acc,
+        "ml_tier_accuracy": ha_acc,
+        "ou_prediction": ou_pred,
+        "runline_prediction": rl_pred,
+        "moneyline_prediction": ha_pred,
+        "strong_ou_prediction": get_strength(ou_acc),
+        "strong_runline_prediction": get_strength(rl_acc),
+        "strong_ml_prediction": get_strength(ha_acc),
         "created_at": datetime.now().isoformat()
     })
 
-supabase.table("daily_combined_predictions").upsert(results, on_conflict=["unique_id"]).execute()
+supabase.table("daily_combined_predictions").insert(results).execute()
 print(f"✅ Uploaded {len(results)} predictions to Supabase.")
 
