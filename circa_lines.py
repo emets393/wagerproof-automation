@@ -9,7 +9,7 @@ from supabase import create_client, Client
 
 # ---------- Supabase Setup ----------
 url = "https://gnjrklxotmbvnxbnnqgq.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInRlcmTL..."
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImduanJrbHhvdG1idm54Ym5ucWdxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0OTQwMzM5MywiZXhwIjoyMDY0OTc5MzkzfQ.RGi1Br_luWhexvBJJC1AaMSEMHJGl9Li_NUlwiUshsA"
 supabase: Client = create_client(url, SUPABASE_KEY)
 TABLE_NAME = "circa_lines"
 
