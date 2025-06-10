@@ -6,6 +6,7 @@ from sklearn.metrics import accuracy_score
 import numpy as np
 from supabase import create_client, Client
 from datetime import datetime
+import uuid
 
 # -----------------------------
 # Supabase Setup
@@ -167,6 +168,7 @@ for i in range(len(input_data)):
     ha_pred = get_prediction(prob_ha[i], ha_acc, row['home_team'], row['away_team'])
 
     results.append({
+        "id": str(uuid.uuid4()),
         "unique_id": row['unique_id'],
         "game_date": row['date'],
         "home_team": row['home_team'],
@@ -183,10 +185,16 @@ for i in range(len(input_data)):
         "strong_ou_prediction": get_strength(ou_acc),
         "strong_runline_prediction": get_strength(rl_acc),
         "strong_ml_prediction": get_strength(ha_acc),
+        "home_ml": row['home_ml'],
+        "away_ml": row['away_ml'],
+        "home_rl": row['home_rl'],
+        "away_rl": row['away_rl'],
+        "o_u_line": row['o_u_line'],
         "created_at": datetime.now().isoformat()
     })
 
 supabase.table("daily_combined_predictions").insert(results).execute()
 print(f"✅ Uploaded {len(results)} predictions to Supabase.")
+
 
 
