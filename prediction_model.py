@@ -29,7 +29,6 @@ print(f"\U0001f4ca Total rows in training data before modeling: {len(training_da
 # Input Data
 input_data_resp = supabase.table("input_values_view").select("*").execute()
 input_data = pd.DataFrame(input_data_resp.data)
-input_data = input_data.dropna()
 
 # -----------------------------
 # Step 2: Features and Targets
@@ -54,9 +53,10 @@ categorical_features = [
     'home_team_number', 'away_team_number','away_pitcher_id','home_pitcher_id'
 ]
 
-target_ou_result = 'ou_result'
-target_run_line_winner = 'run_line_winner'
-target_ha_winner = 'ha_winner'
+input_data = input_data.dropna(subset=features + categorical_features)
+if input_data.empty:
+    print("⚠️ No input rows left to predict after cleaning.")
+    exit()
 
 # -----------------------------
 # Step 3: Encode Categories
@@ -75,9 +75,9 @@ for col in categorical_features:
 # Step 4 + 5: Train on split, evaluate tier accuracy cleanly
 # -----------------------------
 X = training_data[features]
-y_ou = training_data[target_ou_result]
-y_rl = training_data[target_run_line_winner]
-y_ha = training_data[target_ha_winner]
+y_ou = training_data['ou_result']
+y_rl = training_data['run_line_winner']
+y_ha = training_data['ha_winner']
 
 xgb_config = {
     "use_label_encoder": False,
@@ -188,4 +188,5 @@ for i in range(len(input_data)):
 
 supabase.table("daily_combined_predictions").insert(results).execute()
 print(f"✅ Uploaded {len(results)} predictions to Supabase.")
+
 
