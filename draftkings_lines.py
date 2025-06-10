@@ -4,6 +4,7 @@ import re
 import regex as re2
 import pandas as pd
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -34,8 +35,9 @@ soup = BeautifulSoup(driver.page_source, 'html.parser')
 driver.quit()
 
 # ------------------ Identify target date ------------------
-target_date = datetime.today().date()
-print(f"🎯 Target date: {target_date}")
+eastern = ZoneInfo("America/New_York")
+target_date = datetime.now(tz=eastern).date()
+print(f"🎯 Target date (NY time): {target_date}")
 
 # ------------------ Collect date tags in page ------------------
 date_pattern = re.compile(r'^[A-Za-z]+,?\s?[A-Za-z]{3}\s?\d{1,2}$')
