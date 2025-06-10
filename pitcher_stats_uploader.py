@@ -159,10 +159,24 @@ for game in games:
 # -----------------------------
 # Upload to Supabase
 # -----------------------------
+# -----------------------------
+# Upload to Supabase
+# -----------------------------
 df = pd.DataFrame(results)
-print(f"🧹 Deleting old data from `pitching_data_today`...")
-supabase.table("pitching_data_today").delete().neq("unique_id", "").execute()
+
+print(f"🧹 Deleting today's data from `pitching_data_today`...")
+try:
+    # only delete rows where date == today_str
+    supabase.table("pitching_data_today") \
+        .delete() \
+        .eq("date", today_str) \
+        .execute()
+    print("✅ Old data deleted.")
+except Exception as e:
+    print(f"⚠️ Warning: Failed to delete old data (continuing anyway): {e}")
 
 print(f"⬆️ Uploading {len(df)} rows...")
-supabase.table("pitching_data_today").insert(df.to_dict("records")).execute()
+supabase.table("pitching_data_today") \
+    .insert(df.to_dict("records")) \
+    .execute()
 print("✅ Done.")
