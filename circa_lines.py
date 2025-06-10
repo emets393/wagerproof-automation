@@ -159,7 +159,7 @@ df['rl_prediction_strength'] = df.apply(
     axis=1
 )
 
-# ── Prediction logic for Total (Over/Under) ──
+# Total (Over/Under)
 df['total_prediction'] = df.apply(
     lambda r: 'Over' if r['Total_Over_Handle'] > r['Total_Under_Handle'] else 'Under',
     axis=1
@@ -173,7 +173,7 @@ df['total_prediction_strength'] = df.apply(
     axis=1
 )
 
-# 1) Build the final payload
+# ---------- Final Payload & Upsert ----------
 df_final = df[[
     'unique_id','date','Away_Team','Home_Team',
     'Money_Away','Money_Home',
@@ -185,13 +185,13 @@ df_final = df[[
     'total_prediction','total_prediction_strength'
 ]]
 
-# 2) Sanitize out inf/NaN so JSON is valid
-import numpy as np
+# sanitize out inf/NaN so JSON is valid
 df_final = df_final.replace([np.inf, -np.inf], np.nan).where(pd.notnull(df_final), None)
 
-# 3) Single upsert
+# single upsert
 supabase.table(TABLE_NAME) \
     .upsert(df_final.to_dict('records'), on_conflict=['unique_id']) \
     .execute()
 
 print("✅ Circa lines with predictions uploaded")
+
