@@ -176,22 +176,23 @@ for i in range(len(input_data)):
         "ou_probability": float(prob_ou[i]),
         "run_line_probability": float(prob_rl[i]),
         "ml_probability": float(prob_ha[i]),
-        "ou_tier_accuracy": ou_acc,
-        "run_line_tier_accuracy": rl_acc,
-        "ml_tier_accuracy": ha_acc,
+        "ou_tier_accuracy": float(ou_acc) if ou_acc is not None else None,
+        "run_line_tier_accuracy": float(rl_acc) if rl_acc is not None else None,
+        "ml_tier_accuracy": float(ha_acc) if ha_acc is not None else None,
         "ou_prediction": ou_pred,
         "runline_prediction": rl_pred,
         "moneyline_prediction": ha_pred,
         "strong_ou_prediction": get_strength(ou_acc),
         "strong_runline_prediction": get_strength(rl_acc),
         "strong_ml_prediction": get_strength(ha_acc),
-        "home_ml": row['home_ml'],
-        "away_ml": row['away_ml'],
-        "home_rl": row['home_rl'],
-        "away_rl": row['away_rl'],
-        "o_u_line": row['o_u_line'],
+        "home_ml": float(row['home_ml']),
+        "away_ml": float(row['away_ml']),
+        "home_rl": float(row['home_rl']),
+        "away_rl": float(row['away_rl']),
+        "o_u_line": float(row['o_u_line']),
         "created_at": datetime.now().isoformat()
     })
+
 
 supabase.table("daily_combined_predictions").insert(results).execute()
 print(f"✅ Uploaded {len(results)} predictions to Supabase.")
