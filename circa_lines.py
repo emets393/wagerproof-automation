@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import re
 import numpy as np
+import math
 from datetime import datetime
 from supabase import create_client, Client
 
@@ -185,13 +186,23 @@ df_final = df[[
     'total_prediction','total_prediction_strength'
 ]]
 
-# sanitize out inf/NaN so JSON is valid
-df_final = df_final.replace([np.inf, -np.inf], np.nan).where(pd.notnull(df_final), None)
+# Clean out any inf/NaN floats so that JSON encoding will succeed
+records = df_final.to_dict('records')
+clean_records = []
+for row in records:
+    cleaned = {}
+    for k, v in row.items():
+        if isinstance(v, float) and not math.isfinite(v):
+            cleaned[k] = None
+        else:
+            cleaned[k] = v
+    clean_records.append(cleaned)
 
-# single upsert
+# Single upsert
 supabase.table(TABLE_NAME) \
-    .upsert(df_final.to_dict('records'), on_conflict=['unique_id']) \
+    .upsert(clean_records, on_conflict=['unique_id']) \
     .execute()
 
 print("✅ Circa lines with predictions uploaded")
+
 
