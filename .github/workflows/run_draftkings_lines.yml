@@ -44,5 +44,6 @@ jobs:
       - name: Run Prediction Model
         run: python prediction_model.py
 
-
+      - name: Run Circa Lines
+        run: python circa_lines.py
 
