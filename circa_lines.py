@@ -4,6 +4,7 @@ from selenium.webdriver.chrome.options import Options
 from bs4 import BeautifulSoup
 import pandas as pd
 import re
+import numpy as np
 from datetime import datetime
 from supabase import create_client, Client
 
@@ -158,7 +159,7 @@ df['rl_prediction_strength'] = df.apply(
     axis=1
 )
 
-# Total (Over/Under)
+# ── Prediction logic for Total (Over/Under) ──
 df['total_prediction'] = df.apply(
     lambda r: 'Over' if r['Total_Over_Handle'] > r['Total_Under_Handle'] else 'Under',
     axis=1
@@ -172,7 +173,7 @@ df['total_prediction_strength'] = df.apply(
     axis=1
 )
 
-# ---------- Final Upsert ----------
+# 1) Build the final payload
 df_final = df[[
     'unique_id','date','Away_Team','Home_Team',
     'Money_Away','Money_Home',
@@ -184,6 +185,11 @@ df_final = df[[
     'total_prediction','total_prediction_strength'
 ]]
 
+# 2) Sanitize out inf/NaN so JSON is valid
+import numpy as np
+df_final = df_final.replace([np.inf, -np.inf], np.nan).where(pd.notnull(df_final), None)
+
+# 3) Single upsert
 supabase.table(TABLE_NAME) \
     .upsert(df_final.to_dict('records'), on_conflict=['unique_id']) \
     .execute()
