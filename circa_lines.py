@@ -15,6 +15,7 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 supabase: Client = create_client(url, SUPABASE_KEY)
 TABLE_NAME = "circa_lines"
 
+
 # ---------- Team Name Mapping ----------
 team_name_map = {
     "Arizona Diamondbacks": "Arizona", "Atlanta Braves": "Atlanta",
@@ -71,7 +72,8 @@ def split_matchup(matchup):
             return pd.Series([away, home])
     return pd.Series([None, None])
 
-df[['Away_Full', 'Home_Full']] = df['Matchup'].apply(lambda m: split_matchup(m.replace('History','').strip()))
+df[['Away_Full','Home_Full']] = df['Matchup']\
+    .apply(lambda m: split_matchup(m.replace('History','').strip()))
 df['Away_Team'] = df['Away_Full'].map(team_name_map)
 df['Home_Team'] = df['Home_Full'].map(team_name_map)
 
@@ -79,7 +81,7 @@ df['Home_Team'] = df['Home_Full'].map(team_name_map)
 def split_money(val):
     val = val.replace('–','-').strip()
     parts = re.findall(r'-?\d+', val)
-    return pd.Series([int(parts[0]), int(parts[1])]) if len(parts) == 2 else pd.Series([None, None])
+    return pd.Series([int(parts[0]), int(parts[1])]) if len(parts) == 2 else pd.Series([None,None])
 
 df[['Money_Away','Money_Home']] = df['Money'].apply(split_money)
 
@@ -87,7 +89,7 @@ df[['Money_Away','Money_Home']] = df['Money'].apply(split_money)
 def split_pct(val):
     parts = re.findall(r'\d+%?', val)
     clean = [p.rstrip('%') for p in parts]
-    return pd.Series(clean[:2]) if len(clean) >= 2 else pd.Series([None, None])
+    return pd.Series(clean[:2]) if len(clean) >= 2 else pd.Series([None,None])
 
 df[['Handle_Away','Handle_Home']]       = df['Handle'].apply(split_pct)
 df[['Bets_Away','Bets_Home']]           = df['Bets'].apply(split_pct)
@@ -100,7 +102,7 @@ df[['Total_Over_Bets','Total_Under_Bets']]     = df['Bets_2'].apply(split_pct)
 # ---------- Split Run Line ----------
 def split_rl(val):
     parts = re.findall(r'[+-]?\d+\.?\d*', val)
-    return pd.Series(parts[:2]) if len(parts) == 2 else pd.Series([None, None])
+    return pd.Series(parts[:2]) if len(parts) == 2 else pd.Series([None,None])
 
 df[['RL_Away','RL_Home']] = df['RL'].apply(split_rl)
 
@@ -115,8 +117,12 @@ for c in pct_cols:
 
 df['Money_Away'] = pd.to_numeric(df['Money_Away'], errors='coerce')
 df['Money_Home'] = pd.to_numeric(df['Money_Home'], errors='coerce')
-df['RL_Away']   = pd.to_numeric(df['RL_Away'],   errors='coerce')
-df['RL_Home']   = pd.to_numeric(df['RL_Home'],   errors='coerce')
+df['RL_Away']    = pd.to_numeric(df['RL_Away'],   errors='coerce')
+df['RL_Home']    = pd.to_numeric(df['RL_Home'],   errors='coerce')
+
+# --- Convert Money to integers to match your schema ---
+df['Money_Away'] = df['Money_Away'].round(0).astype("Int64")
+df['Money_Home'] = df['Money_Home'].round(0).astype("Int64")
 
 # ---------- Date + Excel Serial ----------
 df['date'] = datetime.today().strftime('%Y-%m-%d')
@@ -134,41 +140,47 @@ df = df.dropna(subset=['Away_Team','Home_Team'])
 df['unique_id'] = df['Home_Team'] + df['Away_Team'] + df['excel_date'].astype(str)
 
 # ---------- Prediction Logic ----------
-# Money Line
+# Money Line pick
 df['ml_prediction'] = df.apply(
     lambda r: r['Home_Team'] if r['Handle_Home'] > r['Handle_Away'] else r['Away_Team'],
     axis=1
 )
+
+# Run Line pick
+df['rl_prediction'] = df.apply(
+    lambda r: r['Home_Team'] if r['RL_Handle_Home'] > r['RL_Handle_Away'] else r['Away_Team'],
+    axis=1
+)
+
+# Total pick
+df['total_prediction'] = df.apply(
+    lambda r: 'Over' if r['Total_Over_Handle'] > r['Total_Under_Handle'] else 'Under',
+    axis=1
+)
+
+# ── Updated strength logic ──
+def strength_label(diff, threshold=0.30):
+    return "Strong" if abs(diff) >= threshold else "Basic"
+
 df['ml_prediction_strength'] = df.apply(
-    lambda r: abs(
-        (r['Handle_Home'] - r['Bets_Home']) if r['Handle_Home'] > r['Handle_Away']
+    lambda r: strength_label(
+        (r['Handle_Home'] - r['Bets_Home']) if r['ml_prediction'] == r['Home_Team']
         else (r['Handle_Away'] - r['Bets_Away'])
     ),
     axis=1
 )
 
-# Run Line
-df['rl_prediction'] = df.apply(
-    lambda r: r['Home_Team'] if r['RL_Handle_Home'] > r['RL_Handle_Away'] else r['Away_Team'],
-    axis=1
-)
 df['rl_prediction_strength'] = df.apply(
-    lambda r: abs(
-        (r['RL_Handle_Home'] - r['RL_Bets_Home']) if r['RL_Handle_Home'] > r['RL_Handle_Away']
+    lambda r: strength_label(
+        (r['RL_Handle_Home'] - r['RL_Bets_Home']) if r['rl_prediction'] == r['Home_Team']
         else (r['RL_Handle_Away'] - r['RL_Bets_Away'])
     ),
     axis=1
 )
 
-# Total (Over/Under)
-df['total_prediction'] = df.apply(
-    lambda r: 'Over' if r['Total_Over_Handle'] > r['Total_Under_Handle'] else 'Under',
-    axis=1
-)
 df['total_prediction_strength'] = df.apply(
-    lambda r: abs(
-        (r['Total_Over_Handle'] - r['Total_Over_Bets'])
-        if r['Total_Over_Handle'] > r['Total_Under_Handle']
+    lambda r: strength_label(
+        (r['Total_Over_Handle'] - r['Total_Over_Bets']) if r['total_prediction'] == 'Over'
         else (r['Total_Under_Handle'] - r['Total_Under_Bets'])
     ),
     axis=1
@@ -186,7 +198,7 @@ df_final = df[[
     'total_prediction','total_prediction_strength'
 ]]
 
-# Clean out any inf/NaN floats so that JSON encoding will succeed
+# Clean out any inf/NaN floats so JSON encoding will succeed
 records = df_final.to_dict('records')
 clean_records = []
 for row in records:
@@ -204,5 +216,4 @@ supabase.table(TABLE_NAME) \
     .execute()
 
 print("✅ Circa lines with predictions uploaded")
-
 
