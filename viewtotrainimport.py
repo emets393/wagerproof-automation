@@ -72,9 +72,11 @@ for _, row in df_input.iterrows():
 
     training_rows.append(row_dict)
 
-# ----------------------------- Insert New Rows -----------------------------
+# ----------------------------- Upsert New Rows -----------------------------
 if training_rows:
-    supabase.table("training_data").insert(training_rows).execute()
-    print(f"✅ Inserted {len(training_rows)} new rows into training_data.")
+    resp = supabase.table("training_data")\
+      .upsert(training_rows, on_conflict=["unique_id"])\
+      .execute()
+    print(f"✅ Upserted {len(training_rows)} rows into training_data.")
 else:
-    print("⚠️ No new rows to insert.")
+    print("⚠️ No new rows to upsert.")
