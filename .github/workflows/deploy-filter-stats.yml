@@ -4,11 +4,12 @@ on:
   push:
     paths:
       - 'supabase/functions/**'
-  workflow_dispatch:      # ← must be here, _not_ indented under push
+  workflow_dispatch:
 
 jobs:
   deploy-filter-stats:
     runs-on: ubuntu-latest
+
     steps:
       - name: 📥 Check out code
         uses: actions/checkout@v3
@@ -22,6 +23,9 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: supabase functions deploy filter-stats --no-confirm
+        run: |
+          supabase functions deploy filter-stats \
+            --project-ref gnjrklxotmbvnxbnnqgq
+
 
 
