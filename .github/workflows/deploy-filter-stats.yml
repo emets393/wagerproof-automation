@@ -4,24 +4,19 @@ on:
   push:
     paths:
       - 'supabase/functions/**'
-  workflow_dispatch:
+  workflow_dispatch:      # ← must be here, _not_ indented under push
 
 jobs:
   deploy-filter-stats:
     runs-on: ubuntu-latest
-
     steps:
       - name: 📥 Check out code
         uses: actions/checkout@v3
 
--     - name: ⚙️ Install Supabase CLI
--       uses: supabase/cli-action@v1
--       with:
--         version: 'latest'
-+     - name: ⚙️ Install Supabase CLI
-+       uses: supabase/setup-cli@v1
-+       with:
-+         version: latest
+      - name: ⚙️ Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
 
       - name: 🚀 Deploy filter-stats function
         env:
