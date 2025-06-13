@@ -1,3 +1,4 @@
+# .github/workflows/deploy-filter-stats.yml
 name: 🚀 Deploy filter-stats
 
 on:
@@ -9,21 +10,25 @@ on:
 jobs:
   deploy-filter-stats:
     runs-on: ubuntu-latest
+    # Supply the PAT here so the CLI can authenticate
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: gnjrklxotmbvnxbnnqgq
 
     steps:
       - name: 📥 Check out code
         uses: actions/checkout@v3
 
-      - name: ⚙️ Install & Authenticate Supabase CLI
-        uses: supabase/setup@v1
+      - name: ⚙️ Install Supabase CLI
+        uses: supabase/setup-cli@v1
         with:
-          version: latest            # pin or use 'latest'
-          token: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          version: latest
 
-      - name: 🚀 Deploy filter-stats function
+      - name: 🚀 Deploy filter-stats
         run: |
           supabase functions deploy filter-stats \
-            --project-ref gnjrklxotmbvnxbnnqgq
+            --project-ref $PROJECT_REF
+
 
 
 
