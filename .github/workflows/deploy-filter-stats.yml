@@ -6,7 +6,6 @@ on:
       - 'supabase/functions/**'
   workflow_dispatch:
 
-
 jobs:
   deploy-filter-stats:
     runs-on: ubuntu-latest
@@ -15,16 +14,14 @@ jobs:
       - name: 📥 Check out code
         uses: actions/checkout@v3
 
-      - name: ⚙️ Set up Node.js
-        uses: actions/setup-node@v3
+      - name: ⚙️ Install Supabase CLI
+        uses: supabase/cli-action@v1
         with:
-          node-version: '18'
-
-      - name: 📦 Install Supabase CLI
-        run: npm install -g supabase
+          version: 'latest'
 
       - name: 🚀 Deploy filter-stats function
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: supabase functions deploy filter-stats --no-confirm
+
