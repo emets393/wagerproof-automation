@@ -1,0 +1,29 @@
+name: 🚀 Deploy filter-stats
+
+# Run on any push to supabase/functions/*
+on:
+  push:
+    paths:
+      - 'supabase/functions/**'
+
+jobs:
+  deploy-filter-stats:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Check out code
+        uses: actions/checkout@v3
+
+      - name: ⚙️ Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: 📦 Install Supabase CLI
+        run: npm install -g supabase
+
+      - name: 🚀 Deploy filter-stats function
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: supabase functions deploy filter-stats --no-confirm
