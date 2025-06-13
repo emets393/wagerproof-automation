@@ -1,10 +1,11 @@
 name: 🚀 Deploy filter-stats
 
-# Run on any push to supabase/functions/*
 on:
   push:
     paths:
       - 'supabase/functions/**'
+  workflow_dispatch:
+
 
 jobs:
   deploy-filter-stats:
