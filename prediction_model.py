@@ -25,42 +25,43 @@ training_data_resp = supabase.table("training_data").select("*").execute()
 training_data = pd.DataFrame(training_data_resp.data)
 training_data = training_data[pd.to_datetime(training_data['date']).dt.date < today]
 
-print(f"\U0001f4ca Total rows in training data before modeling: {len(training_data)}")
-
 # Input Data
 input_data_resp = supabase.table("input_values_view").select("*").execute()
 input_data = pd.DataFrame(input_data_resp.data)
+
+print(f"\U0001f4ca Total rows in training data before cleaning: {len(training_data)}")
 
 # -----------------------------
 # Step 2: Features and Targets
 # -----------------------------
 features = [
-    'series_game_number', 'series_home_wins',
-    'series_away_wins', 'series_overs', 'series_unders', 'o_u_line',
-    'home_ml', 'home_rl', 'home_ml_handle', 'home_ml_bets',
-    'home_rl_handle', 'home_rl_bets', 'away_ml', 'away_rl',
-    'away_ml_handle', 'away_ml_bets', 'away_rl_handle', 'away_rl_bets',
-    'ou_handle_over', 'ou_bets_over', 'same_division', 'same_league',
-    'home_whip', 'home_era', 'away_whip', 'away_era',
-    'streak', 'away_streak','home_win_pct',
-    'away_win_pct', 'home_ops_last_3', 'away_ops_last_3', 'home_team_last_3',
-    'away_team_last_3',
+    'series_game_number', 'series_home_wins', 'series_away_wins', 'series_overs', 'series_unders', 'o_u_line',
+    'home_ml', 'home_rl', 'home_ml_handle', 'home_ml_bets', 'home_rl_handle', 'home_rl_bets',
+    'away_ml', 'away_rl', 'away_ml_handle', 'away_ml_bets', 'away_rl_handle', 'away_rl_bets',
+    'ou_handle_over', 'ou_bets_over', 'same_division', 'same_league', 'home_whip', 'home_era',
+    'away_whip', 'away_era', 'streak', 'away_streak', 'home_win_pct', 'away_win_pct',
+    'home_ops_last_3', 'away_ops_last_3', 'home_team_last_3', 'away_team_last_3',
     'home_last_win', 'away_last_win', 'home_last_runs', 'away_last_runs',
     'home_last_runs_allowed', 'away_last_runs_allowed'
 ]
 
 categorical_features = [
     'home_handedness', 'away_handedness', 'month', 'day', 'season',
-    'home_team_number', 'away_team_number','away_pitcher_id','home_pitcher_id'
+    'home_team_number', 'away_team_number', 'away_pitcher_id', 'home_pitcher_id'
 ]
 
+# Drop rows with missing values in input data
 input_data = input_data.dropna(subset=features + categorical_features)
 if input_data.empty:
     print("⚠️ No input rows left to predict after cleaning.")
     exit()
 
+# Drop rows with missing values in training target columns
+target_cols = ['ou_result', 'run_line_winner', 'ha_winner']
+training_data = training_data.dropna(subset=target_cols)
+
 # -----------------------------
-# Step 3: Encode Categories
+# Step 3: Encode Categorical
 # -----------------------------
 encoders = {}
 for col in categorical_features:
@@ -73,13 +74,20 @@ for col in categorical_features:
     input_data[col] = input_data[col].apply(lambda x: le.transform([x])[0] if x in le.classes_ else -1)
 
 # -----------------------------
-# Step 4 + 5: Train on split, evaluate tier accuracy cleanly
+# Step 4: Train/Test Split
 # -----------------------------
 X = training_data[features]
 y_ou = training_data['ou_result']
 y_rl = training_data['run_line_winner']
 y_ha = training_data['ha_winner']
 
+X_ou_train, X_ou_test, y_ou_train, y_ou_test = train_test_split(X, y_ou, test_size=0.3, stratify=y_ou, random_state=42)
+X_rl_train, X_rl_test, y_rl_train, y_rl_test = train_test_split(X, y_rl, test_size=0.3, stratify=y_rl, random_state=42)
+X_ha_train, X_ha_test, y_ha_train, y_ha_test = train_test_split(X, y_ha, test_size=0.3, stratify=y_ha, random_state=42)
+
+# -----------------------------
+# Step 5: Model + Tier Accuracy
+# -----------------------------
 xgb_config = {
     "use_label_encoder": False,
     "eval_metric": "logloss",
@@ -119,10 +127,6 @@ def get_prediction(prob, tier_acc, pos_label, neg_label):
 def get_strength(tier_acc):
     return "strong" if tier_acc is not None and (tier_acc >= 0.55 or tier_acc <= 0.45) else "basic"
 
-X_ou_train, X_ou_test, y_ou_train, y_ou_test = train_test_split(X, y_ou, test_size=0.3, stratify=y_ou, random_state=42)
-X_rl_train, X_rl_test, y_rl_train, y_rl_test = train_test_split(X, y_rl, test_size=0.3, stratify=y_rl, random_state=42)
-X_ha_train, X_ha_test, y_ha_train, y_ha_test = train_test_split(X, y_ha, test_size=0.3, stratify=y_ha, random_state=42)
-
 model_ou = xgb.XGBClassifier(**xgb_config)
 model_ou.fit(X_ou_train, y_ou_train)
 probs_ou = model_ou.predict_proba(X_ou_test)[:, 1]
@@ -154,7 +158,7 @@ prob_rl = model_rl.predict_proba(X_input)[:, 1]
 prob_ha = model_ha.predict_proba(X_input)[:, 1]
 
 # -----------------------------
-# Step 7: Format and Upload Results
+# Step 7: Format & Upload
 # -----------------------------
 results = []
 for i in range(len(input_data)):
@@ -193,9 +197,7 @@ for i in range(len(input_data)):
         "created_at": datetime.now().isoformat()
     })
 
-
 supabase.table("daily_combined_predictions").insert(results).execute()
 print(f"✅ Uploaded {len(results)} predictions to Supabase.")
-
 
 
