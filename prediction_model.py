@@ -20,27 +20,33 @@ supabase: Client = create_client(url, SUPABASE_KEY)
 # -----------------------------
 today = datetime.today().date()
 
-# Training Data
+# Fetch Training Data
 training_data_resp = supabase.table("training_data").select("*").execute()
 training_data = pd.DataFrame(training_data_resp.data)
+
+# Drop rows with missing targets
+training_data = training_data.dropna(subset=["ou_result", "run_line_winner", "ha_winner"])
+
+# Filter past data only
 training_data = training_data[pd.to_datetime(training_data['date']).dt.date < today]
 
-# Input Data
+print(f"📊 Total rows in training data before modeling: {len(training_data)}")
+
+# Fetch Input Data
 input_data_resp = supabase.table("input_values_view").select("*").execute()
 input_data = pd.DataFrame(input_data_resp.data)
 
-print(f"\U0001f4ca Total rows in training data before cleaning: {len(training_data)}")
-
 # -----------------------------
-# Step 2: Features and Targets
+# Step 2: Feature Setup
 # -----------------------------
 features = [
-    'series_game_number', 'series_home_wins', 'series_away_wins', 'series_overs', 'series_unders', 'o_u_line',
-    'home_ml', 'home_rl', 'home_ml_handle', 'home_ml_bets', 'home_rl_handle', 'home_rl_bets',
+    'series_game_number', 'series_home_wins', 'series_away_wins', 'series_overs', 'series_unders',
+    'o_u_line', 'home_ml', 'home_rl', 'home_ml_handle', 'home_ml_bets', 'home_rl_handle', 'home_rl_bets',
     'away_ml', 'away_rl', 'away_ml_handle', 'away_ml_bets', 'away_rl_handle', 'away_rl_bets',
-    'ou_handle_over', 'ou_bets_over', 'same_division', 'same_league', 'home_whip', 'home_era',
-    'away_whip', 'away_era', 'streak', 'away_streak', 'home_win_pct', 'away_win_pct',
-    'home_ops_last_3', 'away_ops_last_3', 'home_team_last_3', 'away_team_last_3',
+    'ou_handle_over', 'ou_bets_over', 'same_division', 'same_league',
+    'home_whip', 'home_era', 'away_whip', 'away_era', 'streak', 'away_streak',
+    'home_win_pct', 'away_win_pct', 'home_ops_last_3', 'away_ops_last_3',
+    'home_team_last_3', 'away_team_last_3',
     'home_last_win', 'away_last_win', 'home_last_runs', 'away_last_runs',
     'home_last_runs_allowed', 'away_last_runs_allowed'
 ]
@@ -50,18 +56,14 @@ categorical_features = [
     'home_team_number', 'away_team_number', 'away_pitcher_id', 'home_pitcher_id'
 ]
 
-# Drop rows with missing values in input data
+# Drop missing values in input
 input_data = input_data.dropna(subset=features + categorical_features)
 if input_data.empty:
     print("⚠️ No input rows left to predict after cleaning.")
     exit()
 
-# Drop rows with missing values in training target columns
-target_cols = ['ou_result', 'run_line_winner', 'ha_winner']
-training_data = training_data.dropna(subset=target_cols)
-
 # -----------------------------
-# Step 3: Encode Categorical
+# Step 3: Encode Categories
 # -----------------------------
 encoders = {}
 for col in categorical_features:
@@ -74,7 +76,7 @@ for col in categorical_features:
     input_data[col] = input_data[col].apply(lambda x: le.transform([x])[0] if x in le.classes_ else -1)
 
 # -----------------------------
-# Step 4: Train/Test Split
+# Step 4: Split Targets & Train
 # -----------------------------
 X = training_data[features]
 y_ou = training_data['ou_result']
@@ -85,9 +87,6 @@ X_ou_train, X_ou_test, y_ou_train, y_ou_test = train_test_split(X, y_ou, test_si
 X_rl_train, X_rl_test, y_rl_train, y_rl_test = train_test_split(X, y_rl, test_size=0.3, stratify=y_rl, random_state=42)
 X_ha_train, X_ha_test, y_ha_train, y_ha_test = train_test_split(X, y_ha, test_size=0.3, stratify=y_ha, random_state=42)
 
-# -----------------------------
-# Step 5: Model + Tier Accuracy
-# -----------------------------
 xgb_config = {
     "use_label_encoder": False,
     "eval_metric": "logloss",
@@ -99,6 +98,24 @@ xgb_config = {
     "random_state": 42
 }
 
+# Train OU model
+model_ou = xgb.XGBClassifier(**xgb_config)
+model_ou.fit(X_ou_train, y_ou_train)
+probs_ou = model_ou.predict_proba(X_ou_test)[:, 1]
+
+# Train RL model
+model_rl = xgb.XGBClassifier(**xgb_config)
+model_rl.fit(X_rl_train, y_rl_train)
+probs_rl = model_rl.predict_proba(X_rl_test)[:, 1]
+
+# Train HA model
+model_ha = xgb.XGBClassifier(**xgb_config)
+model_ha.fit(X_ha_train, y_ha_train)
+probs_ha = model_ha.predict_proba(X_ha_test)[:, 1]
+
+# -----------------------------
+# Step 5: Tier Accuracy
+# -----------------------------
 def calculate_tier_accuracy(y_true, probs):
     tiers = [(i / 10, (i + 1) / 10) for i in range(10)]
     results = []
@@ -112,6 +129,13 @@ def calculate_tier_accuracy(y_true, probs):
             results.append((low, high, None, 0))
     return results
 
+tier_acc_ou = calculate_tier_accuracy(y_ou_test, probs_ou)
+tier_acc_rl = calculate_tier_accuracy(y_rl_test, probs_rl)
+tier_acc_ha = calculate_tier_accuracy(y_ha_test, probs_ha)
+
+# -----------------------------
+# Step 6: Predictions
+# -----------------------------
 def get_tier_accuracy(prob, tier_accs):
     for low, high, acc, _ in tier_accs:
         if low <= prob < high:
@@ -120,45 +144,18 @@ def get_tier_accuracy(prob, tier_accs):
 
 def get_prediction(prob, tier_acc, pos_label, neg_label):
     base = pos_label if prob >= 0.5 else neg_label
-    if tier_acc is None:
-        return base
-    return base if tier_acc >= 0.5 else (neg_label if base == pos_label else pos_label)
+    return base if tier_acc is None or tier_acc >= 0.5 else (neg_label if base == pos_label else pos_label)
 
 def get_strength(tier_acc):
     return "strong" if tier_acc is not None and (tier_acc >= 0.55 or tier_acc <= 0.45) else "basic"
 
-model_ou = xgb.XGBClassifier(**xgb_config)
-model_ou.fit(X_ou_train, y_ou_train)
-probs_ou = model_ou.predict_proba(X_ou_test)[:, 1]
-tier_acc_ou = calculate_tier_accuracy(y_ou_test, probs_ou)
-
-model_rl = xgb.XGBClassifier(**xgb_config)
-model_rl.fit(X_rl_train, y_rl_train)
-probs_rl = model_rl.predict_proba(X_rl_test)[:, 1]
-tier_acc_rl = calculate_tier_accuracy(y_rl_test, probs_rl)
-
-model_ha = xgb.XGBClassifier(**xgb_config)
-model_ha.fit(X_ha_train, y_ha_train)
-probs_ha = model_ha.predict_proba(X_ha_test)[:, 1]
-tier_acc_ha = calculate_tier_accuracy(y_ha_test, probs_ha)
-
-print("\n🔍 OU Tier Accuracy:")
-for t in tier_acc_ou: print(t)
-print("\n🔍 RL Tier Accuracy:")
-for t in tier_acc_rl: print(t)
-print("\n🔍 HA Tier Accuracy:")
-for t in tier_acc_ha: print(t)
-
-# -----------------------------
-# Step 6: Make Predictions
-# -----------------------------
 X_input = input_data[features]
 prob_ou = model_ou.predict_proba(X_input)[:, 1]
 prob_rl = model_rl.predict_proba(X_input)[:, 1]
 prob_ha = model_ha.predict_proba(X_input)[:, 1]
 
 # -----------------------------
-# Step 7: Format & Upload
+# Step 7: Format + Upload Results
 # -----------------------------
 results = []
 for i in range(len(input_data)):
